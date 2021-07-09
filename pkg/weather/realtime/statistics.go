@@ -127,7 +127,7 @@ func (s Statistics) MarshalText() (text []byte, err error) {
 	b.Date(s.Timestamp)                                 // 01
 	b.Time(s.Timestamp)                                 // 02
 	b.Temp(s.OutdoorTemperature)                        // 03
-	b.Int(s.OutsideHumidity)                            // 04
+	b.Int(s.OutdoorHumidity)                            // 04
 	b.Temp(s.DewPoint)                                  // 05
 	b.SpeedKph(s.WindSpeedAvg)                          // 06
 	b.SpeedKph(s.WindSpeedLast)                         // 07
@@ -146,8 +146,8 @@ func (s Statistics) MarshalText() (text []byte, err error) {
 	b.LengthMm(s.MonthlyRainfall)                       // 20
 	b.LengthMm(s.YearlyRainfall)                        // 21
 	b.LengthMm(s.YesterdayRainfall)                     // 22
-	b.Temp(s.InsideTemp)                                // 23
-	b.Int(s.InsideHumidity)                             // 24
+	b.Temp(s.IndoorTemp)                                // 23
+	b.Int(s.IndoorHumidity)                             // 24
 	b.Temp(s.WindChill)                                 // 25
 	b.SignedTemp(s.TempTrend)                           // 26
 	b.Temp(s.TodayTempHi)                               // 27
@@ -165,8 +165,8 @@ func (s Statistics) MarshalText() (text []byte, err error) {
 	b.String(s.CumulusVersion)                          // 39
 	b.Int(s.CumulusBuildNumber)                         // 40
 	b.SpeedKph(s.TenMinGustHi)                          // 41
-	b.Float1(s.HeatIndex)                               // 42
-	b.Float1(s.Humidex)                                 // 43
+	b.Temp(s.HeatIndex)                                 // 42
+	b.Temp(s.Humidex)                                   // 43
 	b.Int(s.UVIndex)                                    // 44
 	b.Float1(s.Evapotranspiration)                      // 45
 	b.Irradiance(s.SolarRadiation)                      // 46

@@ -39,7 +39,7 @@ func New(opts ...OptionFn) (*Store, error) {
 		return nil, fmt.Errorf("db open error: %w", err)
 	}
 
-	err = db.AutoMigrate(weather.Observation{})
+	err = db.AutoMigrate(Observation{})
 	if err != nil {
 		return nil, fmt.Errorf("db migrate error: %w", err)
 	}
@@ -47,22 +47,22 @@ func New(opts ...OptionFn) (*Store, error) {
 	return &Store{db: db}, nil
 }
 
-func (s *Store) Write(value interface{}) (int64, error) {
-	tx := s.db.Create(value)
-	return tx.RowsAffected, tx.Error
+func (s *Store) DB() *gorm.DB { return s.db }
+
+func (s *Store) WriteObservation(o weather.Observation) (*weather.Observation, error) {
+	var mo Observation
+	mo.FromObservation(o)
+	tx := s.db.Create(&mo)
+	return mo.ToObservation(), tx.Error
 }
 
-func (s *Store) LastObservation() *weather.Observation {
-	var res weather.Observation
-	tx := s.db.Order("timestamp DESC").First(&res)
+func (s *Store) LastObservation(now time.Time) *weather.Observation {
+	now = now.UTC()
+
+	var res Observation
+	tx := s.db.Where("timestamp <= ?", now).Order("timestamp DESC").Limit(1).Find(&res)
 	if tx.RowsAffected == 0 {
 		return nil
 	}
-	return &res
-}
-
-func (s *Store) Statistics(now time.Time) *weather.Statistics {
-	var stats weather.Statistics
-
-	return &stats
+	return res.ToObservation()
 }

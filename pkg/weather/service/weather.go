@@ -38,7 +38,7 @@ var (
 )
 
 type ObservationWriter interface {
-	Write(value interface{}) (int64, error)
+	WriteObservation(o weather.Observation) (*weather.Observation, error)
 }
 
 type Handler struct {
@@ -77,28 +77,28 @@ type ecowitt struct {
 
 func (e ecowitt) ToObservation() weather.Observation {
 	return weather.Observation{
-		Timestamp:          e.Timestamp,
-		BarometricAbsHpa:   e.BarometricAbs.Hectopascals(),
-		BarometricRelHpa:   e.BarometricRel.Hectopascals(),
-		HourlyRainMm:       e.HourlyRain.Millimeters(),
-		DailyRainMm:        e.DailyRain.Millimeters(),
-		WeeklyRainMm:       e.WeeklyRain.Millimeters(),
-		MonthlyRainMm:      e.MonthlyRain.Millimeters(),
-		TotalRainMm:        e.TotalRain.Millimeters(),
-		EventRainMm:        e.EventRain.Millimeters(),
-		RainRatePerHourMm:  e.RainRatePerHour.Millimeters(),
-		HumidityOutdoorPct: float64(e.HumidityOutdoor) / 100.0,
-		HumidityIndoorPct:  float64(e.HumidityIndoor) / 100.0,
-		WindDirDeg:         e.WindDir.Degrees(),
-		WindGustKph:        e.WindGust.KilometersPerHour(),
-		WindSpeedKph:       e.WindSpeed.KilometersPerHour(),
-		MaxDailyGustKph:    e.MaxDailyGust.KilometersPerHour(),
-		Model:              e.Model,
-		StationType:        e.StationType,
-		SolarRadiationWm2:  e.SolarRadiation.WattsPerSquareMetre(),
-		TempOutdoorC:       e.TempOutdoor.Celsius(),
-		TempIndoorC:        e.TempIndoor.Celsius(),
-		UltravioletIndex:   e.UltravioletIndex,
+		Timestamp:        e.Timestamp,
+		BarometricAbs:    e.BarometricAbs,
+		BarometricRel:    e.BarometricRel,
+		HourlyRain:       e.HourlyRain,
+		DailyRain:        e.DailyRain,
+		WeeklyRain:       e.WeeklyRain,
+		MonthlyRain:      e.MonthlyRain,
+		TotalRain:        e.TotalRain,
+		EventRain:        e.EventRain,
+		RainRatePerHour:  e.RainRatePerHour,
+		HumidityOutdoor:  e.HumidityOutdoor,
+		HumidityIndoor:   e.HumidityIndoor,
+		WindDir:          e.WindDir,
+		WindGust:         e.WindGust,
+		WindSpeed:        e.WindSpeed,
+		MaxDailyGust:     e.MaxDailyGust,
+		Model:            e.Model,
+		StationType:      e.StationType,
+		SolarRadiation:   e.SolarRadiation,
+		TempOutdoor:      e.TempOutdoor,
+		TempIndoor:       e.TempIndoor,
+		UltravioletIndex: e.UltravioletIndex,
 	}
 }
 
@@ -135,7 +135,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	}
 
 	obs := obj.ToObservation()
-	_, err = h.Store.Write(&obs)
+	_, err = h.Store.WriteObservation(obs)
 	if err != nil {
 		log.Printf("Error writing observation: %s", err)
 		status = http.StatusInternalServerError

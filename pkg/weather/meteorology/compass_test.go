@@ -34,7 +34,7 @@ func TestCardinalDirection(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(fmt.Sprintf("%03.0f_%s", tt.degrees, tt.want), func(t *testing.T) {
-			assert.Equal(t, tt.want, CardinalDirection(tt.degrees))
+			assert.EqualValues(t, tt.want, CardinalDirection(tt.degrees))
 		})
 	}
 }

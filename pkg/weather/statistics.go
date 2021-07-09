@@ -11,7 +11,7 @@ import (
 type Statistics struct {
 	Timestamp            time.Time             // 01 - Date dd/mm/yy
 	OutdoorTemperature   unit.Temperature      // 03 - outside temperature
-	OutsideHumidity      int                   // 04 - relative humidity http://en.wikipedia.org/wiki/Relative_humidity
+	OutdoorHumidity      int                   // 04 - relative humidity http://en.wikipedia.org/wiki/Relative_humidity
 	DewPoint             unit.Temperature      // 05 - dew point http://en.wikipedia.org/wiki/Dewpoint
 	WindSpeedAvg         unit.Speed            // 06 - wind speed (average for current 24-hour period)
 	WindSpeedLast        unit.Speed            // 07 - latest wind speed reading
@@ -30,8 +30,8 @@ type Statistics struct {
 	MonthlyRainfall      unit.Length           // 20 - monthly rainfall
 	YearlyRainfall       unit.Length           // 21 - yearly rainfall
 	YesterdayRainfall    unit.Length           // 22 - yesterday's rainfall
-	InsideTemp           unit.Temperature      // 23 - inside temperature
-	InsideHumidity       int                   // 24 - inside humidity http://en.wikipedia.org/wiki/Humidity
+	IndoorTemp           unit.Temperature      // 23 - inside temperature
+	IndoorHumidity       int                   // 24 - inside humidity http://en.wikipedia.org/wiki/Humidity
 	WindChill            unit.Temperature      // 25 - Wind chill per https://en.wikipedia.org/wiki/Wind_chill
 	TempTrend            unit.Temperature      // 26 - Average rate of temperature change over the last three hours
 	TodayTempHi          unit.Temperature      // 27 - today's high temp
@@ -49,8 +49,8 @@ type Statistics struct {
 	CumulusVersion       string                // 39 - Cumulus Versions (the specific version in use)
 	CumulusBuildNumber   int                   // 40 - Cumulus build number
 	TenMinGustHi         unit.Speed            // 41 - 10-minute high gust
-	HeatIndex            float64               // 42 - Heat index https://cumuluswiki.org/a/Heat_index
-	Humidex              float64               // 43 - https://cumuluswiki.org/a/Humidex
+	HeatIndex            unit.Temperature      // 42 - Heat index https://cumuluswiki.org/a/Heat_index
+	Humidex              unit.Temperature      // 43 - https://cumuluswiki.org/a/Humidex
 	UVIndex              int                   // 44 - http://en.wikipedia.org/wiki/Uv_index
 	Evapotranspiration   float64               // 45 - evapotranspiration today http://en.wikipedia.org/wiki/Evapotranspiration
 	SolarRadiation       xunit.Irradiance      // 46 - solar radiation W/m2 http://en.wikipedia.org/wiki/Solar_radiation

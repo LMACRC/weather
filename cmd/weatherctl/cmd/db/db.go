@@ -28,6 +28,7 @@ func NewDbCommand() *cobra.Command {
 	cmd.PersistentFlags().StringVar(&dbFlags.Path, "db", "weather.db", "Path to weather database")
 	_ = cmd.MarkPersistentFlagRequired("db")
 	cmd.AddCommand(getLastCommand)
+	cmd.AddCommand(getStatsCommand)
 
 	return cmd
 }
