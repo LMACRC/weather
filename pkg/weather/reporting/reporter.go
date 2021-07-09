@@ -7,29 +7,33 @@ import (
 
 	"github.com/jinzhu/now"
 	"github.com/kelvins/sunrisesunset"
-	"github.com/lmacrc/weather/pkg/weather"
 	"github.com/lmacrc/weather/pkg/weather/meteorology"
 	"github.com/lmacrc/weather/pkg/weather/store"
 	"github.com/martinlindhe/unit"
+	"go.uber.org/zap"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 )
 
 type Reporter struct {
+	log       *zap.Logger
 	store     *store.Store
 	lat, long float64
 }
 
-func New(store *store.Store, lat, long float64) *Reporter {
+func New(log *zap.Logger, store *store.Store, lat, long float64) *Reporter {
 	return &Reporter{
+		log:   log.With(zap.String("service", "reporter")),
 		store: store,
 		lat:   lat,
 		long:  long,
 	}
 }
 
-func (r *Reporter) Generate(ts time.Time) *weather.Statistics {
-	s := &weather.Statistics{
+func (r *Reporter) Generate(ts time.Time) *Statistics {
+	r.log.Info("Starting report generation.")
+
+	s := &Statistics{
 		Timestamp:          ts,
 		WindUnits:          "km/h",
 		TempUnits:          "C",
@@ -48,16 +52,18 @@ func (r *Reporter) Generate(ts time.Time) *weather.Statistics {
 	r.calcWindRun(ts, s)
 	r.calcTrends(ts, s)
 	r.calcLimitsForCurrent24HourPeriod(ts, s)
-	r.calcTenMinuteAverages(ts, s)
+	r.calcTenMinuteStats(ts, s)
 	r.calcIndices(ts, s)
 	r.calcRainfall(ts, s)
 	r.calcIsDaylight(ts, s)
 	r.calcApparentTemp(ts, s)
 
+	r.log.Info("Completed report generation.")
+
 	return s
 }
 
-func (r *Reporter) calcLastObservation(ts time.Time, s *weather.Statistics) {
+func (r *Reporter) calcLastObservation(ts time.Time, s *Statistics) {
 	o := r.store.LastObservation(ts.UTC())
 	s.BarometricPressure = o.BarometricAbs
 	s.RainfallLastHour = o.HourlyRain
@@ -75,11 +81,11 @@ func (r *Reporter) calcLastObservation(ts time.Time, s *weather.Statistics) {
 	s.UVIndex = o.UltravioletIndex
 }
 
-func (r *Reporter) calcDewPoint(_ time.Time, s *weather.Statistics) {
+func (r *Reporter) calcDewPoint(_ time.Time, s *Statistics) {
 	s.DewPoint = meteorology.DewPoint(s.OutdoorTemperature, s.OutdoorHumidity)
 }
 
-func (r *Reporter) calc24HourAverages(ts time.Time, s *weather.Statistics) {
+func (r *Reporter) calc24HourAverages(ts time.Time, s *Statistics) {
 	db := r.store.DB().Scopes(last24Hours(ts))
 
 	res := struct {
@@ -90,15 +96,15 @@ func (r *Reporter) calc24HourAverages(ts time.Time, s *weather.Statistics) {
 	s.WindDirectionAvg = meteorology.CardinalDirection(res.Dir)
 }
 
-func (r *Reporter) calcWindDirection(_ time.Time, s *weather.Statistics) {
+func (r *Reporter) calcWindDirection(_ time.Time, s *Statistics) {
 	s.WindDirection = meteorology.CardinalDirection(s.WindBearing.Degrees())
 }
 
-func (r *Reporter) calcWindForce(_ time.Time, s *weather.Statistics) {
+func (r *Reporter) calcWindForce(_ time.Time, s *Statistics) {
 	s.WindForce = meteorology.SpeedToWindForce(s.WindSpeedAvg).ToInt()
 }
 
-func (r *Reporter) calcWindRun(ts time.Time, s *weather.Statistics) {
+func (r *Reporter) calcWindRun(ts time.Time, s *Statistics) {
 	db := r.store.DB()
 	subQuery := db.Scopes(last24Hours(ts)).
 		Model(&store.Observation{}).
@@ -114,7 +120,7 @@ func (r *Reporter) calcWindRun(ts time.Time, s *weather.Statistics) {
 	s.WindRun = unit.Length(windRunMetres) * unit.Meter
 }
 
-func (r *Reporter) calcTrends(ts time.Time, s *weather.Statistics) {
+func (r *Reporter) calcTrends(ts time.Time, s *Statistics) {
 	s.PressureTrend = unit.Pressure(r.calcLinearRegression("barometric_rel_hpa", ts, -3*time.Hour)) * unit.Hectopascal
 	s.TempTrend = unit.FromCelsius(r.calcLinearRegression("temp_outdoor_c", ts, -3*time.Hour))
 }
@@ -145,13 +151,13 @@ func (r *Reporter) calcLinearRegression(col string, now time.Time, d time.Durati
 	return 0
 }
 
-func (r *Reporter) calcRainfall(ts time.Time, s *weather.Statistics) {
+func (r *Reporter) calcRainfall(ts time.Time, s *Statistics) {
 	// limit for previous hour, as hourly_rain_mm resets to zero after each hour
 	_, val := r.calcLimitAndTimeForPeriod("hourly_rain_mm", limitMax, now.With(ts).BeginningOfHour(), -1*time.Hour)
 	s.RainfallLastHour = unit.Length(val) * unit.Millimeter
 }
 
-func (r *Reporter) calcLimitsForCurrent24HourPeriod(ts time.Time, s *weather.Statistics) {
+func (r *Reporter) calcLimitsForCurrent24HourPeriod(ts time.Time, s *Statistics) {
 	start := now.With(ts).BeginningOfDay()
 	dur := 24 * time.Hour
 	var val float64
@@ -208,12 +214,12 @@ func (r *Reporter) calcLimitAndTimeForPeriod(col string, limit limit, now time.T
 	return res.Timestamp.In(now.Location()), res.Value
 }
 
-func (r *Reporter) calcTenMinuteAverages(ts time.Time, s *weather.Statistics) {
-	s.TenMinGustHi = unit.Speed(r.calcAverageForPeriod("wind_gust_kph", ts, -10*time.Minute)) * unit.KilometersPerHour
-	s.TenMinWindBearingAvg = unit.Angle(r.calcAverageForPeriod("wind_dir_deg", ts, -10*time.Minute)) * unit.Degree
+func (r *Reporter) calcTenMinuteStats(ts time.Time, s *Statistics) {
+	s.TenMinGustHi = unit.Speed(r.calcStatForPeriod("wind_gust_kph", "MAX", ts, -10*time.Minute)) * unit.KilometersPerHour
+	s.TenMinWindBearingAvg = unit.Angle(r.calcStatForPeriod("wind_dir_deg", "AVG", ts, -10*time.Minute)) * unit.Degree
 }
 
-func (r *Reporter) calcAverageForPeriod(col string, now time.Time, d time.Duration) float64 {
+func (r *Reporter) calcStatForPeriod(col, stat string, now time.Time, d time.Duration) float64 {
 	var (
 		start, end time.Time
 	)
@@ -230,19 +236,19 @@ func (r *Reporter) calcAverageForPeriod(col string, now time.Time, d time.Durati
 
 	r.store.DB().Model(&store.Observation{}).
 		Where("timestamp >= ? AND timestamp <= ?", start.UTC(), end.UTC()).
-		Select("AVG(" + col + ") as value").
+		Select(stat + "(" + col + ") as value").
 		Find(&res)
 
 	return res
 }
 
-func (r *Reporter) calcIndices(_ time.Time, s *weather.Statistics) {
+func (r *Reporter) calcIndices(_ time.Time, s *Statistics) {
 	s.HeatIndex = meteorology.HeatIndex(s.OutdoorTemperature, s.OutdoorHumidity)
 	s.Humidex = meteorology.Humidex(s.OutdoorTemperature, s.OutdoorHumidity)
 
 }
 
-func (r *Reporter) calcIsDaylight(ts time.Time, s *weather.Statistics) {
+func (r *Reporter) calcIsDaylight(ts time.Time, s *Statistics) {
 	_, ofs := ts.Zone()
 	utcOffset := time.Duration(ofs) * time.Second
 	p := sunrisesunset.Parameters{
@@ -258,7 +264,7 @@ func (r *Reporter) calcIsDaylight(ts time.Time, s *weather.Statistics) {
 	s.IsDaylight = ts.After(sunrise) && ts.Before(sunset)
 }
 
-func (r *Reporter) calcApparentTemp(_ time.Time, s *weather.Statistics) {
+func (r *Reporter) calcApparentTemp(_ time.Time, s *Statistics) {
 	// Wind chill in Australia also uses the apparent temperature
 	//   per https://en.wikipedia.org/wiki/Wind_chill
 	s.WindChill = meteorology.ApparentTemperature(s.OutdoorTemperature, s.WindSpeedLast, s.OutdoorHumidity)

@@ -31,7 +31,10 @@ func newServer() *cobra.Command {
 		Use:   "server",
 		Short: "Run the LMACRC weather server",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			log, _ := zap.NewProduction()
+			logCfg := zap.NewDevelopmentConfig()
+			logCfg.DisableCaller = true
+			logCfg.Development = false
+			log, _ := logCfg.Build()
 
 			var cfg weather.Config
 
@@ -51,23 +54,18 @@ func newServer() *cobra.Command {
 				return err
 			}
 
-			reportSvc := reporting.New(s, cfg.Latitude, cfg.Longitude)
-			realtimeSvc := realtime.Service{
-				Log:      log.With(zap.String("service", "realtime")),
-				Reporter: reportSvc,
-			}
-
-			ftpSvc := ftp.Service{
-				Log:         log.With(zap.String("service", "ftp")),
-				Config:      cfg.Ftp,
-				DataSources: []ftp.Datasource{realtimeSvc},
+			ftpSvc := ftp.New(cfg.Ftp)
+			reportSvc := reporting.New(log, s, cfg.Latitude, cfg.Longitude)
+			realtimeSvc, err := realtime.New(log, cfg.Realtime, reportSvc, ftpSvc)
+			if err != nil {
+				return err
 			}
 
 			ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt)
 			defer cancel()
 
 			go func() {
-				ftpSvc.Run(ctx)
+				realtimeSvc.Run(ctx)
 			}()
 
 			mux := http.NewServeMux()

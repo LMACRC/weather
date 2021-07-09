@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/lmacrc/weather/pkg/weather"
+	"github.com/lmacrc/weather/pkg/weather/model"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 )
@@ -49,14 +49,14 @@ func New(opts ...OptionFn) (*Store, error) {
 
 func (s *Store) DB() *gorm.DB { return s.db }
 
-func (s *Store) WriteObservation(o weather.Observation) (*weather.Observation, error) {
+func (s *Store) WriteObservation(o model.Observation) (*model.Observation, error) {
 	var mo Observation
 	mo.FromObservation(o)
 	tx := s.db.Create(&mo)
 	return mo.ToObservation(), tx.Error
 }
 
-func (s *Store) LastObservation(now time.Time) *weather.Observation {
+func (s *Store) LastObservation(now time.Time) *model.Observation {
 	now = now.UTC()
 
 	var res Observation

@@ -4,12 +4,12 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/lmacrc/weather/pkg/weather"
+	"github.com/lmacrc/weather/pkg/weather/reporting"
 	"github.com/lmacrc/weather/pkg/xunit"
 	"github.com/martinlindhe/unit"
 )
 
-type Statistics weather.Statistics
+type Statistics reporting.Statistics
 
 type buffer struct {
 	b []byte

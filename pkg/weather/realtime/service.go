@@ -3,32 +3,79 @@ package realtime
 
 import (
 	"bytes"
+	"context"
+	"fmt"
 	"io"
 	"time"
 
 	"github.com/lmacrc/weather/pkg/weather/reporting"
+	"github.com/robfig/cron/v3"
 	"go.uber.org/zap"
 )
 
 // https://cumuluswiki.org/a/Realtime.txt#List_of_fields_in_the_file
 
 type Service struct {
-	Log      *zap.Logger
-	Reporter *reporting.Reporter
+	log        *zap.Logger
+	reporter   Reporter
+	ftp        Ftp
+	scheduled  cron.Schedule
+	uploadPath string
 }
 
-func (s Service) String() string {
-	return "Realtime"
+type Reporter interface {
+	Generate(ts time.Time) *reporting.Statistics
 }
 
-func (s Service) Data(ts time.Time) (path string, r io.ReadCloser, err error) {
-	s.Log.Info("Generating realtime.txt data.")
+type Ftp interface {
+	Upload(ctx context.Context, dir, filename string, r io.Reader) error
+}
 
-	stats := s.Reporter.Generate(ts)
-	data, err := Statistics(*stats).MarshalText()
+func New(log *zap.Logger, cfg Config, reporter Reporter, ftp Ftp) (*Service, error) {
+	schedule, err := cron.ParseStandard(cfg.Cron)
 	if err != nil {
-		return "", nil, err
+		return nil, fmt.Errorf("error parsing cron: %w", err)
 	}
 
-	return "realtime.txt", io.NopCloser(bytes.NewReader(data)), nil
+	return &Service{
+		log:        log.With(zap.String("service", "realtime")),
+		reporter:   reporter,
+		ftp:        ftp,
+		scheduled:  schedule,
+		uploadPath: cfg.UploadPath,
+	}, nil
+}
+
+func (s Service) Run(ctx context.Context) {
+	for {
+		ts := time.Now()
+		next := s.scheduled.Next(ts)
+		sleep := next.Sub(ts)
+		s.log.Info("Next upload scheduled", zap.Time("time", next), zap.Duration("wait_time", sleep))
+
+		select {
+		case <-ctx.Done():
+			s.log.Info("Shutting down")
+			return
+
+		case <-time.After(sleep):
+			s.log.Info("Generating realtime.txt data.")
+
+			stats := s.reporter.Generate(ts)
+			data, err := Statistics(*stats).MarshalText()
+			if err != nil {
+				s.log.Error("Unable to generate statistics", zap.Error(err))
+				continue
+			}
+
+			s.log.Info("Uploading realtime.txt.")
+			err = s.ftp.Upload(ctx, s.uploadPath, "realtime.txt", bytes.NewReader(data))
+			if err != nil {
+				s.log.Error("Failed to upload realtime.txt.", zap.Error(err))
+			} else {
+				s.log.Info("Completed uploading realtime.txt.")
+			}
+
+		}
+	}
 }

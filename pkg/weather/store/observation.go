@@ -3,7 +3,7 @@ package store
 import (
 	"time"
 
-	"github.com/lmacrc/weather/pkg/weather"
+	"github.com/lmacrc/weather/pkg/weather/model"
 	"github.com/lmacrc/weather/pkg/xunit"
 	"github.com/martinlindhe/unit"
 )
@@ -34,7 +34,7 @@ type Observation struct {
 	UltravioletIndex   int
 }
 
-func (m *Observation) FromObservation(wo weather.Observation) {
+func (m *Observation) FromObservation(wo model.Observation) {
 	*m = Observation{
 		ID:                 wo.ID,
 		Timestamp:          wo.Timestamp,
@@ -62,8 +62,8 @@ func (m *Observation) FromObservation(wo weather.Observation) {
 	}
 }
 
-func (m Observation) ToObservation() *weather.Observation {
-	return &weather.Observation{
+func (m Observation) ToObservation() *model.Observation {
+	return &model.Observation{
 		ID:               m.ID,
 		Timestamp:        m.Timestamp,
 		BarometricAbs:    unit.Pressure(m.BarometricAbsHpa) * unit.Hectopascal,

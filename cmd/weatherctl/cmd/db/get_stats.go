@@ -11,13 +11,14 @@ import (
 	"github.com/lmacrc/weather/pkg/xunit"
 	"github.com/martinlindhe/unit"
 	"github.com/spf13/cobra"
+	"go.uber.org/zap"
 )
 
 var getStatsCommand = &cobra.Command{
 	Use:   "get-stats",
 	Short: "Get latest statistics",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		r := reporting.New(db, -41.440577, 147.226651)
+		r := reporting.New(zap.NewNop(), db, -41.440577, 147.226651)
 		res := r.Generate(time.Now())
 		s := structs.New(res)
 		fields := s.Fields()

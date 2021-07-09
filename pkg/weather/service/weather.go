@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/lmacrc/weather/pkg/mapconv"
-	"github.com/lmacrc/weather/pkg/weather"
+	"github.com/lmacrc/weather/pkg/weather/model"
 	"github.com/lmacrc/weather/pkg/xunit"
 	"github.com/martinlindhe/unit"
 	"github.com/mitchellh/mapstructure"
@@ -38,7 +38,7 @@ var (
 )
 
 type ObservationWriter interface {
-	WriteObservation(o weather.Observation) (*weather.Observation, error)
+	WriteObservation(o model.Observation) (*model.Observation, error)
 }
 
 type Handler struct {
@@ -75,8 +75,8 @@ type ecowitt struct {
 	UltravioletIndex int              `mapstructure:"uv"`
 }
 
-func (e ecowitt) ToObservation() weather.Observation {
-	return weather.Observation{
+func (e ecowitt) ToObservation() model.Observation {
+	return model.Observation{
 		Timestamp:        e.Timestamp,
 		BarometricAbs:    e.BarometricAbs,
 		BarometricRel:    e.BarometricRel,
