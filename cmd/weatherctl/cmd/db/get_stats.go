@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/fatih/structs"
-	"github.com/lmacrc/weather/pkg/weather"
 	"github.com/lmacrc/weather/pkg/weather/meteorology"
 	"github.com/lmacrc/weather/pkg/weather/reporting"
 	"github.com/lmacrc/weather/pkg/xunit"
@@ -20,12 +19,7 @@ func newGetStatsCommand() *cobra.Command {
 		Use:   "get-stats",
 		Short: "Get latest statistics",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			cfg, err := weather.ReadConfig(dbFlags.Config)
-			if err != nil {
-				return err
-			}
-
-			r := reporting.New(zap.NewNop(), cfg.Reporting, db, cfg.Location.Latitude, cfg.Location.Longitude)
+			r := reporting.New(zap.NewNop(), config.Reporting, db, config.Location.Latitude, config.Location.Longitude)
 			res := r.Generate(time.Now())
 			s := structs.New(res)
 			fields := s.Fields()

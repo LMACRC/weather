@@ -39,7 +39,7 @@ func newServer() *cobra.Command {
 				return err
 			}
 
-			s, err := store.New()
+			s, err := store.New(store.WithPath(cfg.DbPath))
 			if err != nil {
 				return err
 			}

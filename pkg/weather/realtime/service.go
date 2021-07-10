@@ -19,7 +19,7 @@ type Service struct {
 	log        *zap.Logger
 	reporter   Reporter
 	ftp        Ftp
-	scheduled  cron.Schedule
+	schedule   cron.Schedule
 	uploadPath string
 }
 
@@ -41,7 +41,7 @@ func New(log *zap.Logger, cfg Config, reporter Reporter, ftp Ftp) (*Service, err
 		log:        log.With(zap.String("service", "realtime")),
 		reporter:   reporter,
 		ftp:        ftp,
-		scheduled:  schedule,
+		schedule:   schedule,
 		uploadPath: cfg.UploadPath,
 	}, nil
 }
@@ -49,7 +49,7 @@ func New(log *zap.Logger, cfg Config, reporter Reporter, ftp Ftp) (*Service, err
 func (s Service) Run(ctx context.Context) {
 	for {
 		ts := time.Now()
-		next := s.scheduled.Next(ts)
+		next := s.schedule.Next(ts)
 		sleep := next.Sub(ts)
 		s.log.Info("Next upload scheduled", zap.Time("time", next), zap.Duration("wait_time", sleep))
 
@@ -75,7 +75,6 @@ func (s Service) Run(ctx context.Context) {
 			} else {
 				s.log.Info("Completed uploading realtime.txt.")
 			}
-
 		}
 	}
 }
