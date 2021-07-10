@@ -16,18 +16,32 @@ import (
 )
 
 type Reporter struct {
-	log       *zap.Logger
-	store     *store.Store
-	lat, long float64
+	log            *zap.Logger
+	store          *store.Store
+	barometricType BarometricMeasurementType
+	barometricCol  string
+	lat, long      float64
 }
 
-func New(log *zap.Logger, store *store.Store, lat, long float64) *Reporter {
-	return &Reporter{
-		log:   log.With(zap.String("service", "reporter")),
-		store: store,
-		lat:   lat,
-		long:  long,
+func New(log *zap.Logger, cfg Config, store *store.Store, lat, long float64) *Reporter {
+	r := &Reporter{
+		log:            log.With(zap.String("service", "reporter")),
+		store:          store,
+		barometricType: cfg.BarometricMeasurement.BarometricMeasurementType,
+		lat:            lat,
+		long:           long,
 	}
+
+	switch cfg.BarometricMeasurement.BarometricMeasurementType {
+	case BarometricMeasurementTypeAbsolute:
+		r.barometricCol = "barometric_abs_hpa"
+	case BarometricMeasurementTypeRelative:
+		fallthrough
+	default:
+		r.barometricCol = "barometric_rel_hpa"
+	}
+
+	return r
 }
 
 func (r *Reporter) Generate(ts time.Time) *Statistics {
@@ -65,7 +79,11 @@ func (r *Reporter) Generate(ts time.Time) *Statistics {
 
 func (r *Reporter) calcLastObservation(ts time.Time, s *Statistics) {
 	o := r.store.LastObservation(ts.UTC())
-	s.BarometricPressure = o.BarometricAbs
+	if r.barometricType == BarometricMeasurementTypeAbsolute {
+		s.BarometricPressure = o.BarometricAbs
+	} else {
+		s.BarometricPressure = o.BarometricRel
+	}
 	s.RainfallLastHour = o.HourlyRain
 	s.RainfallToday = o.DailyRain
 	s.MonthlyRainfall = o.MonthlyRain
@@ -121,7 +139,7 @@ func (r *Reporter) calcWindRun(ts time.Time, s *Statistics) {
 }
 
 func (r *Reporter) calcTrends(ts time.Time, s *Statistics) {
-	s.PressureTrend = unit.Pressure(r.calcLinearRegression("barometric_rel_hpa", ts, -3*time.Hour)) * unit.Hectopascal
+	s.PressureTrend = unit.Pressure(r.calcLinearRegression(r.barometricCol, ts, -3*time.Hour)) * unit.Hectopascal
 	s.TempTrend = unit.FromCelsius(r.calcLinearRegression("temp_outdoor_c", ts, -3*time.Hour))
 }
 
@@ -170,9 +188,9 @@ func (r *Reporter) calcLimitsForCurrent24HourPeriod(ts time.Time, s *Statistics)
 	s.TodayWindHi = unit.Speed(val) * unit.KilometersPerHour
 	s.TodayWindGustHiTime, val = r.calcLimitAndTimeForPeriod("wind_gust_kph", limitMax, start, dur)
 	s.TodayWindGustHi = unit.Speed(val) * unit.KilometersPerHour
-	s.TodayPressureHiTime, val = r.calcLimitAndTimeForPeriod("barometric_abs_hpa", limitMax, start, dur)
+	s.TodayPressureHiTime, val = r.calcLimitAndTimeForPeriod(r.barometricCol, limitMax, start, dur)
 	s.TodayPressureHi = unit.Pressure(val) * unit.Hectopascal
-	s.TodayPressureLoTime, val = r.calcLimitAndTimeForPeriod("barometric_abs_hpa", limitMin, start, dur)
+	s.TodayPressureLoTime, val = r.calcLimitAndTimeForPeriod(r.barometricCol, limitMin, start, dur)
 	s.TodayPressureLo = unit.Pressure(val) * unit.Hectopascal
 }
 

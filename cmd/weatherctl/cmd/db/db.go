@@ -6,7 +6,8 @@ import (
 )
 
 var dbFlags = struct {
-	Path string
+	Config string
+	Path   string
 }{
 	Path: "weather.db",
 }
@@ -26,9 +27,11 @@ func NewDbCommand() *cobra.Command {
 	}
 
 	cmd.PersistentFlags().StringVar(&dbFlags.Path, "db", "weather.db", "Path to weather database")
+	cmd.PersistentFlags().StringVar(&dbFlags.Config, "config", "", "Path to config file")
 	_ = cmd.MarkPersistentFlagRequired("db")
-	cmd.AddCommand(getLastCommand)
-	cmd.AddCommand(getStatsCommand)
+	_ = cmd.MarkPersistentFlagRequired("config")
+	cmd.AddCommand(newGetLastCommand())
+	cmd.AddCommand(newGetStatsCommand())
 
 	return cmd
 }

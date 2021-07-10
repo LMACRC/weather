@@ -1,7 +1,6 @@
 package cmd
 
 import (
-	"bytes"
 	"context"
 	"net"
 	"net/http"
@@ -15,7 +14,6 @@ import (
 	"github.com/lmacrc/weather/pkg/weather/reporting"
 	"github.com/lmacrc/weather/pkg/weather/service"
 	"github.com/lmacrc/weather/pkg/weather/store"
-	"github.com/pelletier/go-toml/v2"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
@@ -36,17 +34,9 @@ func newServer() *cobra.Command {
 			logCfg.Development = false
 			log, _ := logCfg.Build()
 
-			var cfg weather.Config
-
-			if data, err := os.ReadFile(flags.Config); err != nil {
-				log.Error("Unable to read config path.", zap.String("path", flags.Config), zap.Error(err))
+			cfg, err := weather.ReadConfig(flags.Config)
+			if err != nil {
 				return err
-			} else {
-				dec := toml.NewDecoder(bytes.NewBuffer(data))
-				if err := dec.Decode(&cfg); err != nil {
-					log.Error("Unable to decode config file.", zap.String("path", flags.Config), zap.Error(err))
-					return err
-				}
 			}
 
 			s, err := store.New()
@@ -55,7 +45,7 @@ func newServer() *cobra.Command {
 			}
 
 			ftpSvc := ftp.New(cfg.Ftp)
-			reportSvc := reporting.New(log, s, cfg.Latitude, cfg.Longitude)
+			reportSvc := reporting.New(log, cfg.Reporting, s, cfg.Location.Latitude, cfg.Location.Longitude)
 			realtimeSvc, err := realtime.New(log, cfg.Realtime, reportSvc, ftpSvc)
 			if err != nil {
 				return err
