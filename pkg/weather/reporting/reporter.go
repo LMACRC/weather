@@ -60,7 +60,6 @@ func (r *Reporter) Generate(ts time.Time) *Statistics {
 
 	r.calcLastObservation(ts, s)
 	r.calcDewPoint(ts, s)
-	r.calc24HourAverages(ts, s)
 	r.calcWindDirection(ts, s)
 	r.calcWindForce(ts, s)
 	r.calcWindRun(ts, s)
@@ -101,17 +100,6 @@ func (r *Reporter) calcLastObservation(ts time.Time, s *Statistics) {
 
 func (r *Reporter) calcDewPoint(_ time.Time, s *Statistics) {
 	s.DewPoint = meteorology.DewPoint(s.OutdoorTemperature, s.OutdoorHumidity)
-}
-
-func (r *Reporter) calc24HourAverages(ts time.Time, s *Statistics) {
-	db := r.store.DB().Scopes(last24Hours(ts))
-
-	res := struct {
-		Speed, Dir float64
-	}{}
-	db.Table("observations").Select("AVG(wind_speed_kph) as speed, AVG(wind_dir_deg) as dir").Find(&res)
-	s.WindSpeedAvg = unit.Speed(res.Speed) * unit.KilometersPerHour
-	s.WindDirectionAvg = meteorology.CardinalDirection(res.Dir)
 }
 
 func (r *Reporter) calcWindDirection(_ time.Time, s *Statistics) {
@@ -235,6 +223,8 @@ func (r *Reporter) calcLimitAndTimeForPeriod(col string, limit limit, now time.T
 func (r *Reporter) calcTenMinuteStats(ts time.Time, s *Statistics) {
 	s.TenMinGustHi = unit.Speed(r.calcStatForPeriod("wind_gust_kph", "MAX", ts, -10*time.Minute)) * unit.KilometersPerHour
 	s.TenMinWindBearingAvg = unit.Angle(r.calcStatForPeriod("wind_dir_deg", "AVG", ts, -10*time.Minute)) * unit.Degree
+	s.WindSpeedAvg = unit.Speed(r.calcStatForPeriod("wind_speed_kph", "MAX", ts, -10*time.Minute)) * unit.KilometersPerHour
+	s.WindDirectionAvg = meteorology.CardinalDirection(s.TenMinWindBearingAvg.Degrees())
 }
 
 func (r *Reporter) calcStatForPeriod(col, stat string, now time.Time, d time.Duration) float64 {
