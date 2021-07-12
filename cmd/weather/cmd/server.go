@@ -9,6 +9,8 @@ import (
 	"strconv"
 
 	"github.com/lmacrc/weather/pkg/weather"
+	_ "github.com/lmacrc/weather/pkg/weather/camera/remote"
+	_ "github.com/lmacrc/weather/pkg/weather/camera/rpi"
 	"github.com/lmacrc/weather/pkg/weather/ftp"
 	"github.com/lmacrc/weather/pkg/weather/realtime"
 	"github.com/lmacrc/weather/pkg/weather/reporting"
@@ -16,6 +18,7 @@ import (
 	"github.com/lmacrc/weather/pkg/weather/store"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 	"go.uber.org/zap"
 )
 
@@ -34,19 +37,25 @@ func newServer() *cobra.Command {
 			logCfg.Development = false
 			log, _ := logCfg.Build()
 
-			cfg, err := weather.ReadConfig(flags.Config)
+			err := weather.ReadConfig(flags.Config)
 			if err != nil {
 				return err
 			}
 
-			s, err := store.New(store.WithPath(cfg.DbPath))
+			log.Info("Loaded config.", zap.String("path", viper.ConfigFileUsed()))
+
+			s, err := store.New(store.WithPath(viper.GetString("database_path")))
 			if err != nil {
 				return err
 			}
 
-			ftpSvc := ftp.New(cfg.Ftp)
-			reportSvc := reporting.New(log, cfg.Reporting, s, cfg.Location.Latitude, cfg.Location.Longitude)
-			realtimeSvc, err := realtime.New(log, cfg.Realtime, reportSvc, ftpSvc)
+			ftpSvc, _ := ftp.New(viper.GetViper())
+			reportSvc, err := reporting.New(log, viper.GetViper(), s)
+			if err != nil {
+				return err
+			}
+
+			realtimeSvc, err := realtime.New(log, viper.GetViper(), reportSvc, ftpSvc)
 			if err != nil {
 				return err
 			}
@@ -64,6 +73,9 @@ func newServer() *cobra.Command {
 
 			wh := service.Handler{Path: "/weather", Store: s}
 			wh.Handle(mux)
+
+			v := viper.GetInt("server.port")
+			_ = v
 
 			var lc net.ListenConfig
 			addr := ":" + strconv.Itoa(flags.Port)
@@ -85,9 +97,11 @@ func newServer() *cobra.Command {
 		},
 	}
 
-	cmd.Flags().IntVarP(&flags.Port, "port", "p", 9876, "Port to listen for requests")
-	cmd.Flags().StringVar(&flags.Config, "config", "weather.toml", "Config file for weather service")
-	_ = cmd.MarkFlagRequired("config")
+	fs := cmd.Flags()
+	fs.IntVarP(&flags.Port, "port", "p", 9876, "Port to listen for requests")
+	fs.StringVar(&flags.Config, "config", "", "Override config file for weather service")
+
+	_ = viper.BindPFlag("server.port", fs.Lookup("port"))
 
 	return cmd
 }

@@ -6,16 +6,22 @@ import (
 	"io"
 
 	"github.com/jlaffaye/ftp"
+	"github.com/spf13/viper"
 )
 
 type Client struct {
 	config Config
 }
 
-func New(cfg Config) *Client {
+func New(v *viper.Viper) (*Client, error) {
+	var cfg Config
+	if err := v.UnmarshalKey("ftp", &cfg); err != nil {
+		return nil, fmt.Errorf("config error: %w", err)
+	}
+
 	return &Client{
 		config: cfg,
-	}
+	}, nil
 }
 
 func (s *Client) Upload(ctx context.Context, dir, filename string, r io.Reader) error {

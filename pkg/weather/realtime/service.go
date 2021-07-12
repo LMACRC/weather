@@ -10,6 +10,7 @@ import (
 
 	"github.com/lmacrc/weather/pkg/weather/reporting"
 	"github.com/robfig/cron/v3"
+	"github.com/spf13/viper"
 	"go.uber.org/zap"
 )
 
@@ -31,7 +32,12 @@ type Ftp interface {
 	Upload(ctx context.Context, dir, filename string, r io.Reader) error
 }
 
-func New(log *zap.Logger, cfg Config, reporter Reporter, ftp Ftp) (*Service, error) {
+func New(log *zap.Logger, v *viper.Viper, reporter Reporter, ftp Ftp) (*Service, error) {
+	var cfg Config
+	if err := v.UnmarshalKey("realtime", &cfg); err != nil {
+		return nil, fmt.Errorf("config error: %w", err)
+	}
+
 	schedule, err := cron.ParseStandard(cfg.Cron)
 	if err != nil {
 		return nil, fmt.Errorf("error parsing cron: %w", err)

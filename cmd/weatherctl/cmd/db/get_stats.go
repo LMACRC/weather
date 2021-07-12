@@ -11,6 +11,7 @@ import (
 	"github.com/lmacrc/weather/pkg/xunit"
 	"github.com/martinlindhe/unit"
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 	"go.uber.org/zap"
 )
 
@@ -19,7 +20,11 @@ func newGetStatsCommand() *cobra.Command {
 		Use:   "get-stats",
 		Short: "Get latest statistics",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			r := reporting.New(zap.NewNop(), config.Reporting, db, config.Location.Latitude, config.Location.Longitude)
+			r, err := reporting.New(zap.NewNop(), viper.GetViper(), db)
+			if err != nil {
+				return err
+			}
+
 			res := r.Generate(time.Now())
 			s := structs.New(res)
 			fields := s.Fields()

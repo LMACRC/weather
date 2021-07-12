@@ -2,6 +2,7 @@ package reporting
 
 import (
 	"database/sql"
+	"fmt"
 	"math"
 	"time"
 
@@ -10,6 +11,7 @@ import (
 	"github.com/lmacrc/weather/pkg/weather/meteorology"
 	"github.com/lmacrc/weather/pkg/weather/store"
 	"github.com/martinlindhe/unit"
+	"github.com/spf13/viper"
 	"go.uber.org/zap"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
@@ -23,16 +25,29 @@ type Reporter struct {
 	lat, long      float64
 }
 
-func New(log *zap.Logger, cfg Config, store *store.Store, lat, long float64) *Reporter {
+func New(log *zap.Logger, vp *viper.Viper, store *store.Store) (*Reporter, error) {
+	var cfg Config
+	if err := vp.UnmarshalKey("reporting", &cfg, viper.DecodeHook(StringToBarometricMeasurementHookFunc())); err != nil {
+		return nil, fmt.Errorf("config error: %w", err)
+	}
+
+	loc := struct {
+		Latitude, Longitude float64
+	}{}
+
+	if err := vp.UnmarshalKey("location", &loc); err != nil {
+		return nil, fmt.Errorf("config error: %w", err)
+	}
+
 	r := &Reporter{
 		log:            log.With(zap.String("service", "reporter")),
 		store:          store,
-		barometricType: cfg.BarometricMeasurement.BarometricMeasurementType,
-		lat:            lat,
-		long:           long,
+		barometricType: cfg.BarometricMeasurement,
+		lat:            loc.Latitude,
+		long:           loc.Longitude,
 	}
 
-	switch cfg.BarometricMeasurement.BarometricMeasurementType {
+	switch cfg.BarometricMeasurement {
 	case BarometricMeasurementTypeAbsolute:
 		r.barometricCol = "barometric_abs_hpa"
 	case BarometricMeasurementTypeRelative:
@@ -41,7 +56,7 @@ func New(log *zap.Logger, cfg Config, store *store.Store, lat, long float64) *Re
 		r.barometricCol = "barometric_rel_hpa"
 	}
 
-	return r
+	return r, nil
 }
 
 func (r *Reporter) Generate(ts time.Time) *Statistics {
