@@ -3,7 +3,6 @@ module github.com/lmacrc/weather
 go 1.16
 
 require (
-	github.com/BurntSushi/toml v0.3.2-0.20210704121015-ebe1404fc680
 	github.com/dhowden/raspicam v0.0.0-20190323051945-60ef25a6629f
 	github.com/fatih/structs v1.1.0
 	github.com/jinzhu/now v1.1.2
