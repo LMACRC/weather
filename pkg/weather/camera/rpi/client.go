@@ -1,9 +1,12 @@
 package rpi
 
 import (
-	"errors"
+	"fmt"
+	"io/ioutil"
+	"os"
 
 	"github.com/dhowden/raspicam"
+	"github.com/hashicorp/go-multierror"
 	"github.com/lmacrc/weather/pkg/weather/camera"
 	"github.com/spf13/viper"
 )
@@ -23,8 +26,8 @@ func init() {
 	})
 }
 
-func New(v *viper.Viper) (*Client, error) {
-	return nil, errors.New("bad config")
+func New(_ *viper.Viper) (*Client, error) {
+	return &Client{}, nil
 }
 
 func (c *Client) Capture(params camera.CaptureParams) (string, error) {
@@ -33,8 +36,28 @@ func (c *Client) Capture(params camera.CaptureParams) (string, error) {
 	s.Height = params.Height
 	s.Camera.Rotation = params.Rotate.ToInt()
 
-	errCh := make(chan error)
-	raspicam.Capture(s, nil, errCh)
+	f, err := ioutil.TempFile("", "webcam.jpg")
+	if err != nil {
+		return "", fmt.Errorf("create: %w", err)
+	}
+	defer func() { _ = f.Close() }()
 
-	return "", nil
+	var errs error
+	errCh := make(chan error)
+	go func() {
+		for x := range errCh {
+			errs = multierror.Append(errs, x)
+		}
+	}()
+
+	raspicam.Capture(s, f, errCh)
+
+	_ = f.Close()
+
+	if errs != nil {
+		_ = os.Remove(f.Name())
+		return "", errs
+	}
+
+	return f.Name(), nil
 }

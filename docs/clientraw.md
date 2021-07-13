@@ -6,7 +6,7 @@ From https://github.com/gjr80/weewx-realtime_clientraw/blob/6cd06d8222a4a2229a33
 | 001     | avg speed | knots      |       |
 | 002     | gust  | knots      |       |
 | 003     | windDir | Deg      |       |
-| 004     | outTemp) | Celsius      |       |
+| 004     | outTemp | Celsius      |       |
 | 005     | outHumidity | %      |       |
 | 006     | barometer | hPa      |       |
 | 007     | daily rain  | mm      |       |

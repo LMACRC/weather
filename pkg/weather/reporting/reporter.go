@@ -28,7 +28,7 @@ type Reporter struct {
 func New(log *zap.Logger, vp *viper.Viper, store *store.Store) (*Reporter, error) {
 	var cfg Config
 	if err := vp.UnmarshalKey("reporting", &cfg, viper.DecodeHook(StringToBarometricMeasurementHookFunc())); err != nil {
-		return nil, fmt.Errorf("config error: %w", err)
+		return nil, fmt.Errorf("config: %w", err)
 	}
 
 	loc := struct {
@@ -36,7 +36,7 @@ func New(log *zap.Logger, vp *viper.Viper, store *store.Store) (*Reporter, error
 	}{}
 
 	if err := vp.UnmarshalKey("location", &loc); err != nil {
-		return nil, fmt.Errorf("config error: %w", err)
+		return nil, fmt.Errorf("config: %w", err)
 	}
 
 	r := &Reporter{

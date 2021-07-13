@@ -31,7 +31,7 @@ func New(v *viper.Viper) (*Client, error) {
 
 	r, err := url.Parse(cfg.RemotePath)
 	if err != nil {
-		return nil, fmt.Errorf("error parsing remote path: %w", err)
+		return nil, fmt.Errorf("remote path: %w", err)
 	}
 
 	r.RawQuery = ""
@@ -54,19 +54,19 @@ func (c Client) Capture(params camera.CaptureParams) (string, error) {
 
 	res, err := http.Get(req.String())
 	if err != nil {
-		return "", fmt.Errorf("get: %w", err)
+		return "", fmt.Errorf("HTTP get: %w", err)
 	}
 	defer func() { _ = res.Body.Close() }()
 
 	f, err := ioutil.TempFile("", "webcam.jpg")
 	if err != nil {
-		return "", fmt.Errorf("create failed: %w", err)
+		return "", fmt.Errorf("create: %w", err)
 	}
 	defer func() { _ = f.Close() }()
 
 	_, err = io.Copy(f, res.Body)
 	if err != nil {
-		return "", fmt.Errorf("copy failed for path %q: %w", f.Name(), err)
+		return "", fmt.Errorf("copy: failed for path %q: %w", f.Name(), err)
 	}
 
 	return f.Name(), nil

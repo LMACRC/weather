@@ -6,7 +6,7 @@ import (
 	"github.com/martinlindhe/unit"
 )
 
-// Humidex calculates the humidity index of temp and rh.
+// Humidex calculates the humidity index using temp and rh.
 // See https://en.wikipedia.org/wiki/Humidex#Computation_formula
 func Humidex(temp unit.Temperature, rh int) unit.Temperature {
 	dew := DewPoint(temp, rh)

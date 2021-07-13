@@ -21,7 +21,7 @@ type Service struct {
 	reporter   Reporter
 	ftp        Ftp
 	schedule   cron.Schedule
-	uploadPath string
+	remotePath string
 }
 
 type Reporter interface {
@@ -35,12 +35,12 @@ type Ftp interface {
 func New(log *zap.Logger, v *viper.Viper, reporter Reporter, ftp Ftp) (*Service, error) {
 	var cfg Config
 	if err := v.UnmarshalKey("realtime", &cfg); err != nil {
-		return nil, fmt.Errorf("config error: %w", err)
+		return nil, fmt.Errorf("config: %w", err)
 	}
 
 	schedule, err := cron.ParseStandard(cfg.Cron)
 	if err != nil {
-		return nil, fmt.Errorf("error parsing cron: %w", err)
+		return nil, fmt.Errorf("parsing cron: %w", err)
 	}
 
 	return &Service{
@@ -48,7 +48,7 @@ func New(log *zap.Logger, v *viper.Viper, reporter Reporter, ftp Ftp) (*Service,
 		reporter:   reporter,
 		ftp:        ftp,
 		schedule:   schedule,
-		uploadPath: cfg.UploadPath,
+		remotePath: cfg.RemoteDir,
 	}, nil
 }
 
@@ -57,11 +57,11 @@ func (s Service) Run(ctx context.Context) {
 		ts := time.Now()
 		next := s.schedule.Next(ts)
 		sleep := next.Sub(ts)
-		s.log.Info("Next upload scheduled", zap.Time("time", next), zap.Duration("wait_time", sleep))
+		s.log.Info("Next upload scheduled.", zap.Time("time", next), zap.Duration("wait_time", sleep))
 
 		select {
 		case <-ctx.Done():
-			s.log.Info("Shutting down")
+			s.log.Info("Shutting down.")
 			return
 
 		case <-time.After(sleep):
@@ -70,12 +70,12 @@ func (s Service) Run(ctx context.Context) {
 			stats := s.reporter.Generate(ts)
 			data, err := Statistics(*stats).MarshalText()
 			if err != nil {
-				s.log.Error("Unable to generate statistics", zap.Error(err))
+				s.log.Error("Unable to generate statistics.", zap.Error(err))
 				continue
 			}
 
 			s.log.Info("Uploading realtime.txt.")
-			err = s.ftp.Upload(ctx, s.uploadPath, "realtime.txt", bytes.NewReader(data))
+			err = s.ftp.Upload(ctx, s.remotePath, "realtime.txt", bytes.NewReader(data))
 			if err != nil {
 				s.log.Error("Failed to upload realtime.txt.", zap.Error(err))
 			} else {

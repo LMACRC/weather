@@ -8,20 +8,20 @@ import (
 )
 
 type Config struct {
-	Cron           string
-	Driver         string
-	LocalPath      string        `toml:"local_path" mapstructure:"local_path"`
-	UploadPath     string        `toml:"upload_path" mapstructure:"upload_path"`
-	UploadFilename string        `toml:"upload_filename" mapstructure:"upload_filename"`
-	CaptureParams  CaptureParams `toml:"capture_params" mapstructure:"capture_params"`
+	Cron          string
+	Driver        string
+	LocalDir      string        `toml:"local_dir" mapstructure:"local_dir"`
+	RemoteDir     string        `toml:"remote_dir" mapstructure:"remote_dir"`
+	Filename      string        `toml:"filename" mapstructure:"filename"`
+	CaptureParams CaptureParams `toml:"capture_params" mapstructure:"capture_params"`
 }
 
 func NewConfig() Config {
 	return Config{
-		Cron:           "*/5 * * * *",
-		Driver:         "rpi",
-		LocalPath:      "webcam.jpg",
-		UploadFilename: "webcam.jpg",
+		Cron:     "*/5 * * * *",
+		Driver:   "rpi",
+		LocalDir: ".",
+		Filename: "webcam.jpg",
 		CaptureParams: CaptureParams{
 			Width:  640,
 			Height: 480,

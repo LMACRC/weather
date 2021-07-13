@@ -36,12 +36,12 @@ func New(opts ...OptionFn) (*Store, error) {
 
 	db, err := gorm.Open(sqlite.Open(c.Path), &gorm.Config{})
 	if err != nil {
-		return nil, fmt.Errorf("db open error: %w", err)
+		return nil, fmt.Errorf("db open: %w", err)
 	}
 
 	err = db.AutoMigrate(Observation{})
 	if err != nil {
-		return nil, fmt.Errorf("db migrate error: %w", err)
+		return nil, fmt.Errorf("db migrate: %w", err)
 	}
 
 	return &Store{db: db}, nil

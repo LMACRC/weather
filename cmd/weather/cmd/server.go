@@ -7,8 +7,10 @@ import (
 	"os"
 	"os/signal"
 	"strconv"
+	"sync"
 
 	"github.com/lmacrc/weather/pkg/weather"
+	"github.com/lmacrc/weather/pkg/weather/camera"
 	_ "github.com/lmacrc/weather/pkg/weather/camera/remote"
 	_ "github.com/lmacrc/weather/pkg/weather/camera/rpi"
 	"github.com/lmacrc/weather/pkg/weather/ftp"
@@ -32,6 +34,9 @@ func newServer() *cobra.Command {
 		Use:   "server",
 		Short: "Run the LMACRC weather server",
 		RunE: func(cmd *cobra.Command, args []string) error {
+			ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt)
+			defer cancel()
+
 			logCfg := zap.NewDevelopmentConfig()
 			logCfg.DisableCaller = true
 			logCfg.Development = false
@@ -49,23 +54,43 @@ func newServer() *cobra.Command {
 				return err
 			}
 
-			ftpSvc, _ := ftp.New(viper.GetViper())
-			reportSvc, err := reporting.New(log, viper.GetViper(), s)
+			vp := viper.GetViper()
+
+			ftpSvc, err := ftp.New(vp)
 			if err != nil {
 				return err
 			}
 
-			realtimeSvc, err := realtime.New(log, viper.GetViper(), reportSvc, ftpSvc)
-			if err != nil {
-				return err
+			if viper.GetBool("realtime.enabled") {
+				reportSvc, err := reporting.New(log, vp, s)
+				if err != nil {
+					return err
+				}
+
+				realtimeSvc, err := realtime.New(log, vp, reportSvc, ftpSvc)
+				if err != nil {
+					return err
+				}
+
+				go func() {
+					realtimeSvc.Run(ctx)
+				}()
+			} else {
+				log.Info("Realtime service disabled.")
 			}
 
-			ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt)
-			defer cancel()
+			if viper.GetBool("camera.enabled") {
+				cameraSvc, err := camera.New(log, vp, ftpSvc)
+				if err != nil {
+					return err
+				}
 
-			go func() {
-				realtimeSvc.Run(ctx)
-			}()
+				go func() {
+					cameraSvc.Run(ctx)
+				}()
+			} else {
+				log.Info("Camera service disabled.")
+			}
 
 			mux := http.NewServeMux()
 
@@ -74,9 +99,6 @@ func newServer() *cobra.Command {
 			wh := service.Handler{Path: "/weather", Store: s}
 			wh.Handle(mux)
 
-			v := viper.GetInt("server.port")
-			_ = v
-
 			var lc net.ListenConfig
 			addr := ":" + strconv.Itoa(flags.Port)
 			ln, err := lc.Listen(ctx, "tcp", addr)
@@ -84,14 +106,23 @@ func newServer() *cobra.Command {
 				return err
 			}
 
+			var wg sync.WaitGroup
+			wg.Add(1)
 			go func() {
+				defer wg.Done()
+
 				_ = http.Serve(ln, mux)
+				log.Info("HTTP server shut down.")
 			}()
 
 			<-ctx.Done()
 			log.Info("Shutting down.")
 
 			_ = ln.Close()
+
+			wg.Wait()
+
+			log.Info("Shutdown complete.")
 
 			return nil
 		},

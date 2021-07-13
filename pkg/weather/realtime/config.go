@@ -1,8 +1,8 @@
 package realtime
 
 type Config struct {
-	Cron       string
-	UploadPath string `toml:"upload_path" mapstructure:"upload_path"`
+	Cron      string
+	RemoteDir string `toml:"remote_dir" mapstructure:"remote_dir"`
 }
 
 func NewConfig() Config {

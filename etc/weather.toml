@@ -1,0 +1,98 @@
+# Global configuration parameters for the weather
+# programme.
+
+#
+# Path to the SQLite database file.
+#
+database_path = "weather.db"
+
+#
+# Location of weather station
+#
+location  = { latitude = -41.440577, longitude = 147.226651 }
+
+#
+# Section for configuring the Ecowitt collection server.
+#
+# The service listens for HTTP requests from the Fine Offset
+# weather station and records them in the local SQLite database.
+#
+[server]
+# Local port to listen for Ecowitt POST requests.
+port = 9876
+
+#
+# Configuration for the FTP client service.
+#
+[ftp]
+address  = "<host>:<port>"
+username = "<username>"
+password = "<password>"
+
+#
+# Section for configuring the service to generate
+# the realtime.txt data.
+#
+[realtime]
+# true to enable this service
+enabled = true
+
+# Standard CRON string specifying a schedue to generate
+# the realtime.txt statistics.
+#
+# See: https://crontab.guru for formatting strings
+#
+# The following example runs the report every 5 minutes
+cron = "*/5 * * * *"
+
+# The remote ftp directory for the realtime.txt file
+remote_dir = "/public_html/wp-content/uploads/weather"
+
+#
+# Parameters to configure the statistics generation sevice,
+# used by the realtime service.
+#
+[reporting]
+#
+# Specifies which barometric pressure measurement to use.
+#
+# - relative: Use relative barometric pressure, based on altitude
+# - absolute: Use absolute barometric pressure at sea level
+barometric_measurement = "relative"
+
+#
+# Parameters to configure the camera service.
+#
+[camera]
+# true to enable this service
+enabled = true
+
+# "Every hour from 8am through 5pm."
+cron = "0 8-17 * * *"
+
+# Name of the camera driver; options are "rpi"
+driver = "rpi"
+
+# The local directory for the image file.
+local_dir = "."
+
+# The remote ftp directory for the image file.
+remote_dir = "/public_html/wp-content/uploads/weather"
+
+# A template for the filename of the captured image.
+filename = "webcam_latest.jpg"
+
+#
+# Parameters to configure the image capture.
+#
+[camera.capture_params]
+# The width of the output image
+width  = 640
+
+# The height of the output image
+height = 480
+
+# The amount to rotate the image in degrees.
+# Valid values are 0, 90, 180 or 270.
+rotate = 270
+

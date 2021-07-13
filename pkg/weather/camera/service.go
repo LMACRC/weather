@@ -1,6 +1,7 @@
 package camera
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"image"
@@ -8,9 +9,11 @@ import (
 	"image/jpeg"
 	"io"
 	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
+	"github.com/lmacrc/weather/pkg/filepath/template"
 	"github.com/robfig/cron/v3"
 	"github.com/spf13/viper"
 	"go.uber.org/zap"
@@ -25,46 +28,46 @@ type Ftp interface {
 }
 
 type Service struct {
-	log        *zap.Logger
-	ftp        Ftp
-	camera     Capturer
-	cfg        Config
-	params     CaptureParams
-	uploadPath string
-	filename   string
-	schedule   cron.Schedule
+	log       *zap.Logger
+	ftp       Ftp
+	camera    Capturer
+	params    CaptureParams
+	localDir  string
+	remoteDir string
+	filename  *template.Template
+	schedule  cron.Schedule
 }
 
 func New(log *zap.Logger, vp *viper.Viper, ftp Ftp) (*Service, error) {
 	var cfg Config
 	if err := vp.UnmarshalKey("camera", &cfg); err != nil {
-		return nil, fmt.Errorf("config error: %w", err)
+		return nil, fmt.Errorf("config: %w", err)
 	}
 
 	schedule, err := cron.ParseStandard(cfg.Cron)
 	if err != nil {
-		return nil, fmt.Errorf("error parsing cron: %w", err)
+		return nil, fmt.Errorf("parsing cron: %w", err)
 	}
 
 	var camera Capturer
 	if driverFn := drivers[cfg.Driver]; driverFn == nil {
 		return nil, fmt.Errorf("invalid camera driver %q: expect [%s]", cfg.Driver, strings.Join(driverList(), ", "))
 	} else if camera, err = driverFn(vp); err != nil {
-		return nil, fmt.Errorf("camera driver create error: %w", err)
+		return nil, fmt.Errorf("camera driver create: %w", err)
 	}
 
-	return &Service{
-		log:    log.With(zap.String("service", "camera")),
-		ftp:    ftp,
-		camera: camera,
-		params: CaptureParams{
-			Width:  640,
-			Height: 480,
-			Rotate: 270,
-		},
-		cfg:      cfg,
-		schedule: schedule,
-	}, nil
+	s := &Service{
+		log:       log.With(zap.String("service", "camera")),
+		ftp:       ftp,
+		camera:    camera,
+		params:    cfg.CaptureParams,
+		localDir:  cfg.LocalDir,
+		remoteDir: cfg.RemoteDir,
+		filename:  template.Must(template.New("file").Parse(cfg.Filename)),
+		schedule:  schedule,
+	}
+
+	return s, nil
 }
 
 func (s Service) Run(ctx context.Context) {
@@ -72,11 +75,11 @@ func (s Service) Run(ctx context.Context) {
 		ts := time.Now()
 		next := s.schedule.Next(ts)
 		sleep := next.Sub(ts)
-		s.log.Info("Next upload scheduled", zap.Time("time", next), zap.Duration("wait_time", sleep))
+		s.log.Info("Next upload scheduled.", zap.Time("time", next), zap.Duration("wait_time", sleep))
 
 		select {
 		case <-ctx.Done():
-			s.log.Info("Shutting down")
+			s.log.Info("Shutting down.")
 			return
 
 		case <-time.After(sleep):
@@ -99,14 +102,24 @@ func (s Service) decodeImage(path string) (image.Image, error) {
 	return img, err
 }
 
-func (s Service) CaptureImage(ctx context.Context, ts time.Time) (string, error) {
+func (s Service) CaptureImage(_ context.Context, ts time.Time) (string, error) {
 	path, err := s.camera.Capture(s.params)
 	if err != nil {
 		return "", fmt.Errorf("capture: %w", err)
 	}
 	defer func() { _ = os.Remove(path) }()
 
-	file, err := os.Create(s.cfg.LocalPath)
+	var buf bytes.Buffer
+	err = s.filename.Execute(&buf, map[string]interface{}{
+		"Now": ts,
+	})
+	if err != nil {
+		return "", fmt.Errorf("filename template: %w", err)
+	}
+
+	fullPath := filepath.Join(s.localDir, buf.String())
+
+	file, err := os.Create(fullPath)
 	if err != nil {
 		return "", err
 	}
@@ -123,7 +136,7 @@ func (s Service) CaptureImage(ctx context.Context, ts time.Time) (string, error)
 		return "", fmt.Errorf("jpeg encode: %w", err)
 	}
 
-	return s.cfg.LocalPath, nil
+	return fullPath, nil
 }
 
 func (s Service) addTimestamp(img *image.RGBA, ts time.Time) {
@@ -143,21 +156,21 @@ func (s Service) addTimestamp(img *image.RGBA, ts time.Time) {
 func (s Service) processNextImage(ctx context.Context, ts time.Time) {
 	s.log.Info("Generating webcam image.")
 
-	path, err := s.CaptureImage(ctx, ts)
+	fullPath, err := s.CaptureImage(ctx, ts)
 	if err != nil {
 		s.log.Error("Failed to capture image.", zap.Error(err))
 		return
 	}
 
-	file, err := os.Open(path)
+	file, err := os.Open(fullPath)
 	if err != nil {
-		s.log.Error("Failed to open captured image file.", zap.String("path", path), zap.Error(err))
+		s.log.Error("Failed to open captured image file.", zap.String("path", fullPath), zap.Error(err))
 		return
 	}
 	defer func() { _ = file.Close() }()
 
-	s.log.Info("Starting image upload.")
-	err = s.ftp.Upload(ctx, s.uploadPath, s.filename, file)
+	s.log.Info("Starting image upload.", zap.String("path", fullPath))
+	err = s.ftp.Upload(ctx, s.remoteDir, filepath.Base(fullPath), file)
 	if err != nil {
 		s.log.Error("Image upload failed.", zap.Error(err))
 	} else {
