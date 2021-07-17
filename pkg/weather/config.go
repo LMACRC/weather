@@ -4,10 +4,10 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/lmacrc/weather/pkg/ftp"
 	"github.com/lmacrc/weather/pkg/weather/camera"
 	"github.com/lmacrc/weather/pkg/weather/camera/remote"
 	"github.com/lmacrc/weather/pkg/weather/camera/rpi"
-	"github.com/lmacrc/weather/pkg/weather/ftp"
 	"github.com/lmacrc/weather/pkg/weather/realtime"
 	"github.com/lmacrc/weather/pkg/weather/reporting"
 	"github.com/mitchellh/mapstructure"

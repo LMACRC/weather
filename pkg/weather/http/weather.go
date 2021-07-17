@@ -1,10 +1,11 @@
-package service
+package http
 
 import (
 	"fmt"
-	"log"
 	"net/http"
+	"net/url"
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/lmacrc/weather/pkg/mapconv"
@@ -14,6 +15,8 @@ import (
 	"github.com/mitchellh/mapstructure"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
+	"github.com/spf13/viper"
+	"go.uber.org/zap"
 )
 
 var (
@@ -35,6 +38,13 @@ var (
 		Name:      "requests_total",
 		Help:      "The total number of processed weather requests",
 	}, []string{"status"})
+
+	httpForwardRequests = promauto.NewCounterVec(prometheus.CounterOpts{
+		Namespace: "weather",
+		Subsystem: "http",
+		Name:      "forward_requests_total",
+		Help:      "The total number of forwarded weather requests",
+	}, []string{"status"})
 )
 
 type ObservationWriter interface {
@@ -42,12 +52,41 @@ type ObservationWriter interface {
 }
 
 type Handler struct {
-	Path  string
-	Store ObservationWriter
+	log       *zap.Logger
+	path      string
+	forwardTo string
+	store     ObservationWriter
+}
+
+// InitViper sets any default values for vp.
+func InitViper(vp *viper.Viper) {
+	vp.SetDefault("http.path", "/weather")
+}
+
+func New(log *zap.Logger, vp *viper.Viper, store ObservationWriter) (*Handler, error) {
+	log = log.With(zap.String("service", "http_handler"))
+
+	var forwardTo string
+	if vp.IsSet("http.dev.forward_to") {
+		forwardTo = vp.GetString("http.dev.forward_to")
+		if _, err := url.Parse(forwardTo); err != nil {
+			log.Error("Unable to forward HTTP requests, invalid url.", zap.Error(err))
+			return nil, fmt.Errorf("forward_url: %w", err)
+		} else {
+			log.Info("Forwarding HTTP requests.", zap.String("forward_to", forwardTo))
+		}
+	}
+
+	return &Handler{
+		log:       log,
+		path:      vp.GetString("http.path"),
+		forwardTo: forwardTo,
+		store:     store,
+	}, nil
 }
 
 func (h *Handler) Handle(mux *http.ServeMux) {
-	mux.Handle(h.Path, h)
+	mux.Handle(h.path, h)
 }
 
 type ecowitt struct {
@@ -115,6 +154,22 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
+	if h.forwardTo != "" {
+		freq, err := http.NewRequest(http.MethodPost, h.forwardTo, strings.NewReader(req.PostForm.Encode()))
+		if err != nil {
+			h.log.Warn("Failed to create forward HTTP request", zap.Error(err))
+		}
+		freq.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		fres, err := defaultClient.Do(freq)
+		if err != nil {
+			httpForwardRequests.WithLabelValues("error").Inc()
+			h.log.Warn("Failed to forward HTTP request", zap.Error(err))
+		} else if fres != nil {
+			httpForwardRequests.WithLabelValues("ok").Inc()
+			_ = fres.Body.Close()
+		}
+	}
+
 	keys := make([]string, 0, len(req.PostForm))
 	for k := range req.PostForm {
 		keys = append(keys, k)
@@ -128,16 +183,16 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 
 	obj, err := h.decode(d)
 	if err != nil {
-		log.Printf("Error decoding ecowitt data: %s", err)
+		h.log.Error("Error decoding ecowitt data.", zap.Error(err))
 		status = http.StatusInternalServerError
 		http.Error(w, fmt.Sprintf("Error decoding ecowitt data: %s", err), status)
 		return
 	}
 
 	obs := obj.ToObservation()
-	_, err = h.Store.WriteObservation(obs)
+	_, err = h.store.WriteObservation(obs)
 	if err != nil {
-		log.Printf("Error writing observation: %s", err)
+		h.log.Error("Error writing observation", zap.Error(err))
 		status = http.StatusInternalServerError
 		http.Error(w, fmt.Sprintf("Error writing observation: %s", err), status)
 		return

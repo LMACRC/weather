@@ -9,14 +9,15 @@ import (
 	"strconv"
 	"sync"
 
+	"github.com/lmacrc/weather/pkg/event"
+	"github.com/lmacrc/weather/pkg/ftp"
 	"github.com/lmacrc/weather/pkg/weather"
 	"github.com/lmacrc/weather/pkg/weather/camera"
 	_ "github.com/lmacrc/weather/pkg/weather/camera/remote"
 	_ "github.com/lmacrc/weather/pkg/weather/camera/rpi"
-	"github.com/lmacrc/weather/pkg/weather/ftp"
+	whttp "github.com/lmacrc/weather/pkg/weather/http"
 	"github.com/lmacrc/weather/pkg/weather/realtime"
 	"github.com/lmacrc/weather/pkg/weather/reporting"
-	"github.com/lmacrc/weather/pkg/weather/service"
 	"github.com/lmacrc/weather/pkg/weather/store"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/spf13/cobra"
@@ -34,6 +35,8 @@ func newServer() *cobra.Command {
 		Use:   "server",
 		Short: "Run the LMACRC weather server",
 		RunE: func(cmd *cobra.Command, args []string) error {
+			bus := event.New()
+
 			ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt)
 			defer cancel()
 
@@ -49,12 +52,13 @@ func newServer() *cobra.Command {
 
 			log.Info("Loaded config.", zap.String("path", viper.ConfigFileUsed()))
 
-			s, err := store.New(store.WithPath(viper.GetString("database_path")))
+			s, err := store.New(store.WithPath(viper.GetString("database_path")), store.WithBus(bus))
 			if err != nil {
 				return err
 			}
 
 			vp := viper.GetViper()
+			whttp.InitViper(vp)
 
 			ftpSvc, err := ftp.New(vp)
 			if err != nil {
@@ -96,7 +100,11 @@ func newServer() *cobra.Command {
 
 			mux.Handle("/metrics", promhttp.Handler())
 
-			wh := service.Handler{Path: "/weather", Store: s}
+			wh, err := whttp.New(log, vp, s)
+			if err != nil {
+				return err
+			}
+
 			wh.Handle(mux)
 
 			var lc net.ListenConfig

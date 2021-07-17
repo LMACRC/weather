@@ -117,26 +117,29 @@ func (s Service) CaptureImage(_ context.Context, ts time.Time) (string, error) {
 		return "", fmt.Errorf("filename template: %w", err)
 	}
 
-	fullPath := filepath.Join(s.localDir, buf.String())
-
-	file, err := os.Create(fullPath)
+	dstPath := filepath.Join(s.localDir, buf.String())
+	dstFile, err := os.Create(dstPath)
 	if err != nil {
 		return "", err
 	}
-	defer func() { _ = file.Close() }()
+	defer func() { _ = dstFile.Close() }()
 
 	src, err := s.decodeImage(path)
+	if err != nil {
+		return "", fmt.Errorf("decode image: %w", err)
+	}
+
 	dst := image.NewRGBA(src.Bounds())
 	draw.Copy(dst, image.Pt(0, 0), src, src.Bounds(), draw.Over, nil)
 
 	s.addTimestamp(dst, ts)
 
-	err = jpeg.Encode(file, dst, &jpeg.Options{Quality: 100})
+	err = jpeg.Encode(dstFile, dst, &jpeg.Options{Quality: 100})
 	if err != nil {
 		return "", fmt.Errorf("jpeg encode: %w", err)
 	}
 
-	return fullPath, nil
+	return dstPath, nil
 }
 
 func (s Service) addTimestamp(img *image.RGBA, ts time.Time) {

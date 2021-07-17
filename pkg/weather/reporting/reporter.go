@@ -230,6 +230,7 @@ func (r *Reporter) calcLimitAndTimeForPeriod(col string, limit limit, now time.T
 		Where("timestamp >= ? AND timestamp <= ?", start.UTC(), end.UTC()).
 		Select("timestamp, " + col + " as value").
 		Order(order).Order("timestamp").
+		Limit(1).
 		Find(&res)
 
 	return res.Timestamp.In(now.Location()), res.Value

@@ -10,8 +10,8 @@ import (
 
 type Observation struct {
 	ID                 uint      `gorm:"primarykey"`
-	Timestamp          time.Time `gorm:"index:idx_ts_wind_dir,sort:desc,priority:1;index:index_ts_wind_gust,sort:desc,priority:1;index:idx_ts_wind_speed,sort:desc,priority:1;index:idx_ts_outdoor_temp,sort:desc,priority:1;index:idx_ts_indoor_temp,sort:desc,priority:1;index:idx_ts_barom_abs,sort:desc,priority:1"`
-	BarometricAbsHpa   float64   `gorm:"index:idx_ts_barom_abs,sort:desc,priority:2"`
+	Timestamp          time.Time `gorm:"index:idx_timestamp,sort:desc,priority:1""`
+	BarometricAbsHpa   float64
 	BarometricRelHpa   float64
 	HourlyRainMm       float64
 	DailyRainMm        float64
@@ -22,15 +22,13 @@ type Observation struct {
 	RainRatePerHourMm  float64
 	HumidityOutdoorPct float64
 	HumidityIndoorPct  float64
-	WindDirDeg         float64 `gorm:"index:idx_ts_wind_dir,sort:desc,priority:2"`
-	WindGustKph        float64 `gorm:"index:idx_ts_wind_gust,sort:desc,priority:2"`
-	WindSpeedKph       float64 `gorm:"index:idx_ts_wind_speed,sort:desc,priority:2"`
+	WindDirDeg         float64
+	WindGustKph        float64
+	WindSpeedKph       float64
 	MaxDailyGustKph    float64
-	Model              string
-	StationType        string
 	SolarRadiationWm2  float64
-	TempOutdoorC       float64 `gorm:"index:idx_ts_outdoor_temp,sort:desc,priority:2"`
-	TempIndoorC        float64 `gorm:"index:idx_ts_indoor_temp,sort:desc,priority:2"`
+	TempOutdoorC       float64
+	TempIndoorC        float64
 	UltravioletIndex   int
 }
 
@@ -53,8 +51,6 @@ func (m *Observation) FromObservation(wo model.Observation) {
 		WindGustKph:        wo.WindGust.KilometersPerHour(),
 		WindSpeedKph:       wo.WindSpeed.KilometersPerHour(),
 		MaxDailyGustKph:    wo.MaxDailyGust.KilometersPerHour(),
-		Model:              wo.Model,
-		StationType:        wo.StationType,
 		SolarRadiationWm2:  wo.SolarRadiation.WattsPerSquareMetre(),
 		TempOutdoorC:       wo.TempOutdoor.Celsius(),
 		TempIndoorC:        wo.TempIndoor.Celsius(),
@@ -81,8 +77,6 @@ func (m Observation) ToObservation() *model.Observation {
 		WindGust:         unit.Speed(m.WindGustKph) * unit.KilometersPerHour,
 		WindSpeed:        unit.Speed(m.WindSpeedKph) * unit.KilometersPerHour,
 		MaxDailyGust:     unit.Speed(m.MaxDailyGustKph) * unit.KilometersPerHour,
-		Model:            m.Model,
-		StationType:      m.StationType,
 		SolarRadiation:   xunit.Irradiance(m.SolarRadiationWm2) * xunit.WattPerSquareMetre,
 		TempOutdoor:      unit.FromCelsius(m.TempOutdoorC),
 		TempIndoor:       unit.FromCelsius(m.TempIndoorC),
