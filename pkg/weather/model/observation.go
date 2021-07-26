@@ -25,8 +25,6 @@ type Observation struct {
 	WindGust         unit.Speed
 	WindSpeed        unit.Speed
 	MaxDailyGust     unit.Speed
-	Model            string
-	StationType      string
 	SolarRadiation   xunit.Irradiance
 	TempOutdoor      unit.Temperature
 	TempIndoor       unit.Temperature

@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"context"
+	"fmt"
 	"net"
 	"net/http"
 	"os"
@@ -10,20 +11,28 @@ import (
 	"sync"
 
 	"github.com/lmacrc/weather/pkg/event"
-	"github.com/lmacrc/weather/pkg/ftp"
 	"github.com/lmacrc/weather/pkg/weather"
-	"github.com/lmacrc/weather/pkg/weather/camera"
-	_ "github.com/lmacrc/weather/pkg/weather/camera/remote"
-	_ "github.com/lmacrc/weather/pkg/weather/camera/rpi"
 	whttp "github.com/lmacrc/weather/pkg/weather/http"
-	"github.com/lmacrc/weather/pkg/weather/realtime"
 	"github.com/lmacrc/weather/pkg/weather/reporting"
+	"github.com/lmacrc/weather/pkg/weather/service/archive"
+	"github.com/lmacrc/weather/pkg/weather/service/camera"
+	ftp2 "github.com/lmacrc/weather/pkg/weather/service/ftp"
+	"github.com/lmacrc/weather/pkg/weather/service/realtime"
 	"github.com/lmacrc/weather/pkg/weather/store"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"github.com/robfig/cron/v3"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	"go.uber.org/zap"
+
+	// install camera drivers
+	_ "github.com/lmacrc/weather/pkg/weather/service/camera/remote"
+	_ "github.com/lmacrc/weather/pkg/weather/service/camera/rpi"
 )
+
+func init() {
+	rootCmd.AddCommand(newServer())
+}
 
 func newServer() *cobra.Command {
 	flags := struct {
@@ -52,18 +61,35 @@ func newServer() *cobra.Command {
 
 			log.Info("Loaded config.", zap.String("path", viper.ConfigFileUsed()))
 
-			s, err := store.New(store.WithPath(viper.GetString("database_path")), store.WithBus(bus))
+			db, err := weather.OpenDb(viper.GetString("database_path"))
+			if err != nil {
+				return err
+			}
+
+			s, err := store.New(db, store.WithBus(bus))
 			if err != nil {
 				return err
 			}
 
 			vp := viper.GetViper()
 			whttp.InitViper(vp)
+			archive.InitViper(vp)
 
-			ftpSvc, err := ftp.New(vp)
-			if err != nil {
-				return err
+			var ftpSvc *ftp2.Service
+			if viper.GetBool("ftp.enabled") {
+				ftpSvc, err = ftp2.New(log, db, vp)
+				if err != nil {
+					return err
+				}
+
+				go func() {
+					ftpSvc.Run(ctx)
+				}()
+			} else {
+				log.Info("FTP service disabled.")
 			}
+
+			cs := cron.New()
 
 			if viper.GetBool("realtime.enabled") {
 				reportSvc, err := reporting.New(log, vp, s)
@@ -95,6 +121,23 @@ func newServer() *cobra.Command {
 			} else {
 				log.Info("Camera service disabled.")
 			}
+
+			if viper.GetBool("archive.enabled") {
+				archiveSvc, err := archive.New(log, db, vp, s, ftpSvc)
+				if err != nil {
+					return err
+				}
+
+				// run at 00:30 each day
+				sch, err := cron.ParseStandard("30 0 * * *")
+				if err != nil {
+					panic(fmt.Sprintf("Unable to parse cron spec: %s", err))
+				}
+
+				cs.Schedule(sch, archiveSvc)
+			}
+
+			cs.Start()
 
 			mux := http.NewServeMux()
 

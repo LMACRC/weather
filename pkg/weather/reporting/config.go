@@ -2,9 +2,6 @@ package reporting
 
 import (
 	"fmt"
-	"reflect"
-
-	"github.com/mitchellh/mapstructure"
 )
 
 type BarometricMeasurementType int
@@ -24,20 +21,6 @@ func (b *BarometricMeasurementType) UnmarshalText(text []byte) error {
 		return fmt.Errorf("invalid barometric measurement type: %s", string(text))
 	}
 	return nil
-}
-
-func StringToBarometricMeasurementHookFunc() mapstructure.DecodeHookFunc {
-	return func(f reflect.Type, t reflect.Type, data interface{}) (interface{}, error) {
-		if f.Kind() != reflect.String {
-			return data, nil
-		}
-		if t != reflect.TypeOf(BarometricMeasurementType(5)) {
-			return data, nil
-		}
-
-		var r BarometricMeasurementType
-		return r, r.UnmarshalText([]byte(data.(string)))
-	}
 }
 
 type Config struct {

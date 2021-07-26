@@ -6,7 +6,6 @@ import (
 
 	"github.com/lmacrc/weather/pkg/event"
 	"github.com/lmacrc/weather/pkg/weather/model"
-	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 )
 
@@ -16,17 +15,10 @@ var (
 )
 
 type config struct {
-	Path string
-	Bus  *event.Bus
+	Bus *event.Bus
 }
 
 type OptionFn func(c *config)
-
-func WithPath(path string) OptionFn {
-	return func(c *config) {
-		c.Path = path
-	}
-}
 
 func WithBus(eb *event.Bus) OptionFn {
 	return func(c *config) {
@@ -39,26 +31,19 @@ type Store struct {
 	bus *event.Bus
 }
 
-func New(opts ...OptionFn) (*Store, error) {
-	c := config{
-		Path: "weather.db",
-	}
-
+func New(db *gorm.DB, opts ...OptionFn) (*Store, error) {
+	c := config{}
 	for _, opt := range opts {
 		opt(&c)
 	}
 
 	bus := c.Bus
 	if bus == nil {
+		// No one will be listening to this bus, but it keeps the code simple elsewhere
 		bus = event.New()
 	}
 
-	db, err := gorm.Open(sqlite.Open(c.Path), &gorm.Config{})
-	if err != nil {
-		return nil, fmt.Errorf("db open: %w", err)
-	}
-
-	err = db.AutoMigrate(Observation{})
+	err := db.AutoMigrate(Observation{})
 	if err != nil {
 		return nil, fmt.Errorf("db migrate: %w", err)
 	}

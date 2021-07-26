@@ -11,6 +11,7 @@ import (
 	"github.com/lmacrc/weather/pkg/weather/meteorology"
 	"github.com/lmacrc/weather/pkg/weather/store"
 	"github.com/martinlindhe/unit"
+	"github.com/mitchellh/mapstructure"
 	"github.com/spf13/viper"
 	"go.uber.org/zap"
 	"gorm.io/gorm"
@@ -27,7 +28,7 @@ type Reporter struct {
 
 func New(log *zap.Logger, vp *viper.Viper, store *store.Store) (*Reporter, error) {
 	var cfg Config
-	if err := vp.UnmarshalKey("reporting", &cfg, viper.DecodeHook(StringToBarometricMeasurementHookFunc())); err != nil {
+	if err := vp.UnmarshalKey("reporting", &cfg, viper.DecodeHook(mapstructure.TextUnmarshallerHookFunc())); err != nil {
 		return nil, fmt.Errorf("config: %w", err)
 	}
 

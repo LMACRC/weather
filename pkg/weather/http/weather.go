@@ -132,8 +132,6 @@ func (e ecowitt) ToObservation() model.Observation {
 		WindGust:         e.WindGust,
 		WindSpeed:        e.WindSpeed,
 		MaxDailyGust:     e.MaxDailyGust,
-		Model:            e.Model,
-		StationType:      e.StationType,
 		SolarRadiation:   e.SolarRadiation,
 		TempOutdoor:      e.TempOutdoor,
 		TempIndoor:       e.TempIndoor,

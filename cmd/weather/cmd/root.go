@@ -6,15 +6,15 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func Execute() {
-	cmd := &cobra.Command{
+var (
+	rootCmd = &cobra.Command{
 		Use: "weather",
 	}
+)
 
-	cmd.AddCommand(newServer())
-
-	if err := cmd.Execute(); err != nil {
-		cmd.PrintErr(err)
+func Execute() {
+	if err := rootCmd.Execute(); err != nil {
+		rootCmd.PrintErr(err)
 		os.Exit(1)
 	}
 }

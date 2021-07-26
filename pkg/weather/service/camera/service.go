@@ -7,13 +7,13 @@ import (
 	"image"
 	"image/color"
 	"image/jpeg"
-	"io"
 	"os"
 	"path/filepath"
 	"strings"
 	"time"
 
 	"github.com/lmacrc/weather/pkg/filepath/template"
+	"github.com/lmacrc/weather/pkg/weather/service"
 	"github.com/robfig/cron/v3"
 	"github.com/spf13/viper"
 	"go.uber.org/zap"
@@ -23,13 +23,9 @@ import (
 	"golang.org/x/image/math/fixed"
 )
 
-type Ftp interface {
-	Upload(ctx context.Context, dir, filename string, r io.Reader) error
-}
-
 type Service struct {
 	log       *zap.Logger
-	ftp       Ftp
+	ftp       service.Ftp
 	camera    Capturer
 	params    CaptureParams
 	localDir  string
@@ -38,7 +34,7 @@ type Service struct {
 	schedule  cron.Schedule
 }
 
-func New(log *zap.Logger, vp *viper.Viper, ftp Ftp) (*Service, error) {
+func New(log *zap.Logger, vp *viper.Viper, ftp service.Ftp) (*Service, error) {
 	var cfg Config
 	if err := vp.UnmarshalKey("camera", &cfg); err != nil {
 		return nil, fmt.Errorf("config: %w", err)
@@ -71,6 +67,8 @@ func New(log *zap.Logger, vp *viper.Viper, ftp Ftp) (*Service, error) {
 }
 
 func (s Service) Run(ctx context.Context) {
+	s.log.Info("Starting.")
+
 	for {
 		ts := time.Now()
 		next := s.schedule.Next(ts)
@@ -172,11 +170,14 @@ func (s Service) processNextImage(ctx context.Context, ts time.Time) {
 	}
 	defer func() { _ = file.Close() }()
 
-	s.log.Info("Starting image upload.", zap.String("path", fullPath))
-	err = s.ftp.Upload(ctx, s.remoteDir, filepath.Base(fullPath), file)
+	s.log.Info("Enqueue image upload.", zap.String("path", fullPath))
+	err = s.ftp.Enqueue(service.FtpRequest{
+		LocalPath:      fullPath,
+		RemoteDir:      s.remoteDir,
+		RemoteFilename: filepath.Base(fullPath),
+		RemoveLocal:    false,
+	})
 	if err != nil {
-		s.log.Error("Image upload failed.", zap.Error(err))
-	} else {
-		s.log.Info("Image upload succeeded.")
+		s.log.Error("Failed to queue image upload.", zap.Error(err))
 	}
 }

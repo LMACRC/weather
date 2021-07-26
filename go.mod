@@ -3,14 +3,15 @@ module github.com/lmacrc/weather
 go 1.16
 
 require (
-	github.com/alexsergivan/transliterator v1.0.0 // indirect
+	github.com/alexsergivan/transliterator v1.0.0
 	github.com/dhowden/raspicam v0.0.0-20190323051945-60ef25a6629f
 	github.com/fatih/structs v1.1.0
+	github.com/gocarina/gocsv v0.0.0-20210516172204-ca9e8a8ddea8
 	github.com/hashicorp/go-multierror v1.0.0
 	github.com/jinzhu/now v1.1.2
 	github.com/jlaffaye/ftp v0.0.0-20210307004419-5d4190119067
 	github.com/kelvins/sunrisesunset v0.0.0-20210220141756-39fa1bd816d5
-	github.com/lestrrat-go/strftime v1.0.5-0.20210506102746-09329cc2f5be // indirect
+	github.com/lestrrat-go/strftime v1.0.5-0.20210506102746-09329cc2f5be
 	github.com/martinlindhe/unit v0.0.0-20210313160520-19b60e03648d
 	github.com/mitchellh/mapstructure v1.4.1
 	github.com/prometheus/client_golang v1.11.0

@@ -20,7 +20,7 @@ func newGetStatsCommand() *cobra.Command {
 		Use:   "get-stats",
 		Short: "Get latest statistics",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			r, err := reporting.New(zap.NewNop(), viper.GetViper(), db)
+			r, err := reporting.New(zap.NewNop(), viper.GetViper(), st)
 			if err != nil {
 				return err
 			}

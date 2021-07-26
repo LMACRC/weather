@@ -2,11 +2,16 @@ package db
 
 import (
 	"github.com/lmacrc/weather/pkg/weather"
-	_ "github.com/lmacrc/weather/pkg/weather/camera/remote"
-	_ "github.com/lmacrc/weather/pkg/weather/camera/rpi"
+	whttp "github.com/lmacrc/weather/pkg/weather/http"
+	"github.com/lmacrc/weather/pkg/weather/service/archive"
 	"github.com/lmacrc/weather/pkg/weather/store"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+	"gorm.io/gorm"
+
+	// install camera drivers
+	_ "github.com/lmacrc/weather/pkg/weather/service/camera/remote"
+	_ "github.com/lmacrc/weather/pkg/weather/service/camera/rpi"
 )
 
 var dbFlags = struct {
@@ -17,7 +22,8 @@ var dbFlags = struct {
 }
 
 var (
-	db *store.Store
+	db *gorm.DB
+	st *store.Store
 )
 
 func NewDbCommand() *cobra.Command {
@@ -30,15 +36,25 @@ func NewDbCommand() *cobra.Command {
 				return
 			}
 
-			db, err = store.New(store.WithPath(viper.GetString("database_path")))
+			vp := viper.GetViper()
+			whttp.InitViper(vp)
+			archive.InitViper(vp)
+
+			db, err = weather.OpenDb(viper.GetString("database_path"))
+			if err != nil {
+				return err
+			}
+
+			st, err = store.New(db)
 			return
 		},
 	}
 
-	cmd.PersistentFlags().StringVar(&dbFlags.Config, "config", "", "Override  config file for weather service")
+	cmd.PersistentFlags().StringVar(&dbFlags.Config, "config", "", "Override config file for weather service")
 	cmd.AddCommand(newGetLastCommand())
 	cmd.AddCommand(newGetStatsCommand())
 	cmd.AddCommand(newGetImageCommand())
+	cmd.AddCommand(newArchiveCommand())
 
 	return cmd
 }

@@ -8,7 +8,7 @@ import (
 	"net/url"
 	"strconv"
 
-	"github.com/lmacrc/weather/pkg/weather/camera"
+	"github.com/lmacrc/weather/pkg/weather/service/camera"
 	"github.com/spf13/viper"
 )
 

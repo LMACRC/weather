@@ -2,13 +2,13 @@
 package realtime
 
 import (
-	"bytes"
 	"context"
 	"fmt"
-	"io"
+	"os"
 	"time"
 
 	"github.com/lmacrc/weather/pkg/weather/reporting"
+	"github.com/lmacrc/weather/pkg/weather/service"
 	"github.com/robfig/cron/v3"
 	"github.com/spf13/viper"
 	"go.uber.org/zap"
@@ -19,7 +19,7 @@ import (
 type Service struct {
 	log        *zap.Logger
 	reporter   Reporter
-	ftp        Ftp
+	ftp        service.Ftp
 	schedule   cron.Schedule
 	remotePath string
 }
@@ -28,11 +28,7 @@ type Reporter interface {
 	Generate(ts time.Time) *reporting.Statistics
 }
 
-type Ftp interface {
-	Upload(ctx context.Context, dir, filename string, r io.Reader) error
-}
-
-func New(log *zap.Logger, v *viper.Viper, reporter Reporter, ftp Ftp) (*Service, error) {
+func New(log *zap.Logger, v *viper.Viper, reporter Reporter, ftp service.Ftp) (*Service, error) {
 	var cfg Config
 	if err := v.UnmarshalKey("realtime", &cfg); err != nil {
 		return nil, fmt.Errorf("config: %w", err)
@@ -53,6 +49,8 @@ func New(log *zap.Logger, v *viper.Viper, reporter Reporter, ftp Ftp) (*Service,
 }
 
 func (s Service) Run(ctx context.Context) {
+	s.log.Info("Starting.")
+
 	for {
 		ts := time.Now()
 		next := s.schedule.Next(ts)
@@ -67,19 +65,29 @@ func (s Service) Run(ctx context.Context) {
 		case <-time.After(sleep):
 			s.log.Info("Generating realtime.txt data.")
 
-			stats := s.reporter.Generate(ts)
+			stats := s.reporter.Generate(next)
 			data, err := Statistics(*stats).MarshalText()
 			if err != nil {
 				s.log.Error("Unable to generate statistics.", zap.Error(err))
 				continue
 			}
 
-			s.log.Info("Uploading realtime.txt.")
-			err = s.ftp.Upload(ctx, s.remotePath, "realtime.txt", bytes.NewReader(data))
+			err = os.WriteFile("realtime.txt", data, 0777)
 			if err != nil {
-				s.log.Error("Failed to upload realtime.txt.", zap.Error(err))
-			} else {
-				s.log.Info("Completed uploading realtime.txt.")
+				s.log.Error("Unable to write realtime file.", zap.Error(err))
+				continue
+			}
+
+			expiresAt := s.schedule.Next(time.Now())
+			s.log.Info("Enqueue realtime.txt for upload.", zap.Time("expires_at", expiresAt))
+			err = s.ftp.Enqueue(service.FtpRequest{
+				LocalPath:      "realtime.txt",
+				RemoteDir:      s.remotePath,
+				RemoteFilename: "realtime.txt",
+				ExpiresAt:      &expiresAt,
+			})
+			if err != nil {
+				s.log.Error("Failed to enqueue realtime.txt for upload.", zap.Error(err))
 			}
 		}
 	}

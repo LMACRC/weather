@@ -7,7 +7,7 @@ import (
 	"os/signal"
 	"time"
 
-	"github.com/lmacrc/weather/pkg/weather/camera"
+	"github.com/lmacrc/weather/pkg/weather/service/camera"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	"go.uber.org/zap"

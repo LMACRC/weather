@@ -4,13 +4,13 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/lmacrc/weather/pkg/ftp"
-	"github.com/lmacrc/weather/pkg/weather/camera"
-	"github.com/lmacrc/weather/pkg/weather/camera/remote"
-	"github.com/lmacrc/weather/pkg/weather/camera/rpi"
-	"github.com/lmacrc/weather/pkg/weather/realtime"
 	"github.com/lmacrc/weather/pkg/weather/reporting"
-	"github.com/mitchellh/mapstructure"
+	"github.com/lmacrc/weather/pkg/weather/service/archive"
+	"github.com/lmacrc/weather/pkg/weather/service/camera"
+	"github.com/lmacrc/weather/pkg/weather/service/camera/remote"
+	"github.com/lmacrc/weather/pkg/weather/service/camera/rpi"
+	"github.com/lmacrc/weather/pkg/weather/service/ftp"
+	"github.com/lmacrc/weather/pkg/weather/service/realtime"
 	"github.com/spf13/viper"
 )
 
@@ -24,6 +24,7 @@ type Config struct {
 	Location Location
 
 	Ftp       ftp.Config
+	Archive   archive.Config
 	Realtime  realtime.Config
 	Reporting reporting.Config
 
@@ -40,6 +41,7 @@ func NewConfig() Config {
 		DbPath:    "weather.db",
 		Location:  Location{},
 		Ftp:       ftp.NewConfig(),
+		Archive:   archive.NewConfig(),
 		Realtime:  realtime.NewConfig(),
 		Reporting: reporting.NewConfig(),
 		Camera:    camera.NewConfig(),
@@ -51,13 +53,6 @@ func NewConfig() Config {
 			Rpi:    rpi.NewConfig(),
 		},
 	}
-}
-
-func decoderConfig(dc *mapstructure.DecoderConfig) {
-	dc.DecodeHook = mapstructure.ComposeDecodeHookFunc(dc.DecodeHook,
-		camera.Int64ToRotationHookFunc(),
-		reporting.StringToBarometricMeasurementHookFunc(),
-	)
 }
 
 func init() {

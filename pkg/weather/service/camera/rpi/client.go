@@ -7,7 +7,7 @@ import (
 
 	"github.com/dhowden/raspicam"
 	"github.com/hashicorp/go-multierror"
-	"github.com/lmacrc/weather/pkg/weather/camera"
+	"github.com/lmacrc/weather/pkg/weather/service/camera"
 	"github.com/spf13/viper"
 )
 
