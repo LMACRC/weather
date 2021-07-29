@@ -6,7 +6,7 @@ import (
 	"github.com/martinlindhe/unit"
 )
 
-// DewPoint determines the dew point temperature using t and rh.
+// DewPoint determines the dew point temperature using temperature, t, and relative humidity, rh.
 // Formula based on https://en.wikipedia.org/wiki/Dew_point#Calculating_the_dew_point
 func DewPoint(t unit.Temperature, rh int) unit.Temperature {
 	const (
