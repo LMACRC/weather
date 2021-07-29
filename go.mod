@@ -8,6 +8,7 @@ require (
 	github.com/fatih/structs v1.1.0
 	github.com/gocarina/gocsv v0.0.0-20210516172204-ca9e8a8ddea8
 	github.com/hashicorp/go-multierror v1.0.0
+	github.com/influxdata/influxdb1-client v0.0.0-20200827194710-b269163b24ab
 	github.com/jinzhu/now v1.1.2
 	github.com/jlaffaye/ftp v0.0.0-20210307004419-5d4190119067
 	github.com/kelvins/sunrisesunset v0.0.0-20210220141756-39fa1bd816d5
