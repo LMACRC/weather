@@ -58,38 +58,44 @@ func New(log *zap.Logger, db *gorm.DB, v *viper.Viper, s *store.Store, ftp servi
 }
 
 func (s *Service) Run() {
-	s.log.Info("Archiving data.")
+	s.log.Info("Starting archive process.")
+	err := s.ArchiveAll()
+	if err != nil {
+		s.log.Error("Failed to archive data.", zap.Error(err))
+	} else {
+		s.log.Info("Completed archive process.")
+	}
 }
 
 // ArchiveAll archives all days prior to now
 func (s *Service) ArchiveAll() error {
 	last := now.BeginningOfDay()
-	s.log.Info("Archiving all data prior to today", zap.Time("date", last))
+	s.log.Info("Archiving all data prior to today.", zap.Time("date", last))
 
 	dates, err := s.findAllDates(last)
 	if err != nil {
-		s.log.Info("Failed to locate")
+		s.log.Error("Unable to locate dates to archive.", zap.Error(err))
 		return err
 	}
 	if len(dates) == 0 {
-		s.log.Info("No data to archive")
+		s.log.Info("No data to archive.")
 		return nil
 	}
 
 	for _, dt := range dates {
 		log := s.log.With(zap.String("date", dt.Format("20060102")))
 
-		log.Info("Archiving data")
+		log.Info("Archiving data for date.")
 		path, err := s.Archive(dt)
 		if err != nil {
 			// TODO(sgc): This could be
-			log.Error("Failed to archive data", zap.Error(err))
+			log.Error("Failed to archive data.", zap.Error(err))
 			continue
 		}
-		log.Info("Data archived to file", zap.String("path", path))
+		log.Info("Data archived to file.", zap.String("path", path))
 
 		if s.ftp != nil {
-			log.Info("Queueing file for FTP")
+			log.Info("Queueing file for FTP.")
 			s.ftp.Enqueue(service.FtpRequest{
 				LocalPath:      path,
 				RemoteDir:      s.remoteDir,
