@@ -34,10 +34,10 @@ func (dt *Timestamp) Scan(value interface{}) error {
 }
 
 func (dt *Timestamp) MarshalCSV() (string, error) {
-	return dt.Time.UTC().Format("2006-01-02 15:04:05"), nil
+	return dt.Time.UTC().Format(CurrentTimeStamp), nil
 }
 
 func (dt *Timestamp) UnmarshalCSV(csv string) (err error) {
-	dt.Time, err = time.Parse("2006-01-02 15:04:05", csv)
+	dt.Time, err = time.Parse(CurrentTimeStamp, csv)
 	return err
 }
