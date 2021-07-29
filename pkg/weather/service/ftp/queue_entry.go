@@ -14,6 +14,7 @@ type QueueEntry struct {
 	RemoteFilename string
 	ExpiresAt      *sqlite.Timestamp // ExpiresAt specifies the time which the entry should no longer be uploaded and dropped from the queue.
 	RemoveLocal    bool              // RemoveLocal indicates the file should be removed from the local filesystem after it has been successfully uploaded.
+	Retries        int               // Retries stores the number of times this file has been retries
 }
 
 func (q QueueEntry) TableName() string { return "ftp_queue_entries" }

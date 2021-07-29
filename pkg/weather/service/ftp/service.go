@@ -34,6 +34,7 @@ type Service struct {
 	address  string
 	username string
 	password string
+	retries  int
 }
 
 func New(log *zap.Logger, db *gorm.DB, v *viper.Viper, opts ...optionFn) (*Service, error) {
@@ -55,6 +56,7 @@ func New(log *zap.Logger, db *gorm.DB, v *viper.Viper, opts ...optionFn) (*Servi
 		address:  cfg.Address,
 		username: cfg.Username,
 		password: cfg.Password,
+		retries:  cfg.Retries,
 	}
 
 	for _, opt := range opts {
@@ -77,19 +79,33 @@ func (s *Service) Enqueue(req service.FtpRequest) (err error) {
 
 	rec := NewFromFtpRequest(req)
 	rec.Due = sqlite.Timestamp{Time: time.Now().UTC()}
+	rec.Retries = s.retries
 	return s.db.Create(&rec).Error
 }
 
 func (s *Service) Run(ctx context.Context) {
 	s.log.Info("Starting.")
 
+	var tickCh <-chan time.Time
+
 	for {
 		select {
+
 		case <-s.ch:
 			s.RunQueue(ctx)
+
+		case <-tickCh:
+			tickCh = nil
+			s.RunQueue(ctx)
+
 		case <-ctx.Done():
 			s.log.Info("Shutting down.")
 			return
+		}
+
+		// see if there are any entries due and wake up then
+		if nd, _ := s.nextDue(); nd != nil {
+			tickCh = time.After(nd.Sub(time.Now()))
 		}
 	}
 }
@@ -128,7 +144,18 @@ func (s *Service) processEntry(ctx context.Context, log *zap.Logger, e *QueueEnt
 
 	err = s.client.Upload(ctx, s.address, s.username, s.password, f, e.RemoteDir, e.RemoteFilename)
 	if err != nil {
-		// TODO(sgc): retry?
+		e.Retries++
+		if e.Retries > s.retries {
+			log.Error("Unable to upload file after retrying.", zap.Error(err), zap.Int("retries", s.retries))
+			s.completeEntry(e)
+			return
+		}
+
+		e.Due = sqlite.FromTime(time.Now().Add(1 * time.Minute))
+		s.db.Save(e)
+
+		log.Info("Upload failed; retrying.", zap.Error(err), zap.Time("due", e.Due.Time), zap.Int("retries", e.Retries))
+
 		return
 	}
 
