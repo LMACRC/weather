@@ -2,6 +2,10 @@ package meteorology
 
 type Direction string
 
+func (d Direction) String() string {
+	return string(d)
+}
+
 var directions = []Direction{
 	"N", "NNE", "NE", "ENE",
 	"E", "ESE", "SE", "SSE",
