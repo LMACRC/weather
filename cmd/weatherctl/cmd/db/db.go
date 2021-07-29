@@ -1,6 +1,7 @@
 package db
 
 import (
+	"github.com/lmacrc/weather/pkg/event"
 	"github.com/lmacrc/weather/pkg/weather"
 	whttp "github.com/lmacrc/weather/pkg/weather/http"
 	"github.com/lmacrc/weather/pkg/weather/service/archive"
@@ -22,8 +23,9 @@ var dbFlags = struct {
 }
 
 var (
-	db *gorm.DB
-	st *store.Store
+	bus *event.Bus
+	db  *gorm.DB
+	st  *store.Store
 )
 
 func NewDbCommand() *cobra.Command {
@@ -45,7 +47,9 @@ func NewDbCommand() *cobra.Command {
 				return err
 			}
 
-			st, err = store.New(db)
+			bus = event.New()
+
+			st, err = store.New(db, bus)
 			return
 		},
 	}

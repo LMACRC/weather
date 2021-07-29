@@ -7,6 +7,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/lmacrc/weather/pkg/event"
 	"github.com/lmacrc/weather/pkg/weather/reporting"
 	"github.com/lmacrc/weather/pkg/weather/service"
 	"github.com/robfig/cron/v3"
@@ -16,11 +17,17 @@ import (
 
 // https://cumuluswiki.org/a/Realtime.txt#List_of_fields_in_the_file
 
+var (
+	// NewStatistics is a topic for publishing new statistics calculations.
+	NewStatistics = event.T("realtime:new_stats")
+)
+
 type Service struct {
 	log        *zap.Logger
 	reporter   Reporter
 	ftp        service.Ftp
 	schedule   cron.Schedule
+	bus        *event.Bus
 	remotePath string
 }
 
@@ -28,7 +35,7 @@ type Reporter interface {
 	Generate(ts time.Time) *reporting.Statistics
 }
 
-func New(log *zap.Logger, v *viper.Viper, reporter Reporter, ftp service.Ftp) (*Service, error) {
+func New(log *zap.Logger, v *viper.Viper, reporter Reporter, ftp service.Ftp, bus *event.Bus) (*Service, error) {
 	var cfg Config
 	if err := v.UnmarshalKey("realtime", &cfg); err != nil {
 		return nil, fmt.Errorf("config: %w", err)
@@ -44,6 +51,7 @@ func New(log *zap.Logger, v *viper.Viper, reporter Reporter, ftp service.Ftp) (*
 		reporter:   reporter,
 		ftp:        ftp,
 		schedule:   schedule,
+		bus:        bus,
 		remotePath: cfg.RemoteDir,
 	}, nil
 }
@@ -66,15 +74,17 @@ func (s Service) Run(ctx context.Context) {
 			s.log.Info("Generating realtime.txt data.")
 
 			stats := s.reporter.Generate(next)
+			s.bus.Publish(NewStatistics, stats)
+
 			data, err := Statistics(*stats).MarshalText()
 			if err != nil {
-				s.log.Error("Unable to generate statistics.", zap.Error(err))
+				s.log.Error("Unable to marshal realtime.txt statistics data.", zap.Error(err))
 				continue
 			}
 
 			err = os.WriteFile("realtime.txt", data, 0777)
 			if err != nil {
-				s.log.Error("Unable to write realtime file.", zap.Error(err))
+				s.log.Error("Unable to write realtime.txt file.", zap.Error(err))
 				continue
 			}
 

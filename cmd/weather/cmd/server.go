@@ -10,13 +10,15 @@ import (
 	"strconv"
 	"sync"
 
+	"github.com/lmacrc/weather/pkg/cronzap"
 	"github.com/lmacrc/weather/pkg/event"
 	"github.com/lmacrc/weather/pkg/weather"
 	whttp "github.com/lmacrc/weather/pkg/weather/http"
 	"github.com/lmacrc/weather/pkg/weather/reporting"
 	"github.com/lmacrc/weather/pkg/weather/service/archive"
 	"github.com/lmacrc/weather/pkg/weather/service/camera"
-	ftp2 "github.com/lmacrc/weather/pkg/weather/service/ftp"
+	"github.com/lmacrc/weather/pkg/weather/service/ftp"
+	"github.com/lmacrc/weather/pkg/weather/service/influxdb"
 	"github.com/lmacrc/weather/pkg/weather/service/realtime"
 	"github.com/lmacrc/weather/pkg/weather/store"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
@@ -56,6 +58,7 @@ func newServer() *cobra.Command {
 
 			err := weather.ReadConfig(flags.Config)
 			if err != nil {
+				log.Error("Failed to read configuration.", zap.Error(err))
 				return err
 			}
 
@@ -63,10 +66,11 @@ func newServer() *cobra.Command {
 
 			db, err := weather.OpenDb(viper.GetString("database_path"))
 			if err != nil {
+				log.Error("Failed to open database.", zap.Error(err))
 				return err
 			}
 
-			s, err := store.New(db, store.WithBus(bus))
+			s, err := store.New(db, bus)
 			if err != nil {
 				return err
 			}
@@ -74,11 +78,13 @@ func newServer() *cobra.Command {
 			vp := viper.GetViper()
 			whttp.InitViper(vp)
 			archive.InitViper(vp)
+			influxdb.InitViper(vp)
 
-			var ftpSvc *ftp2.Service
+			var ftpSvc *ftp.Service
 			if viper.GetBool("ftp.enabled") {
-				ftpSvc, err = ftp2.New(log, db, vp)
+				ftpSvc, err = ftp.New(log, db, vp)
 				if err != nil {
+					log.Error("Failed to initialise FTP service.", zap.Error(err))
 					return err
 				}
 
@@ -89,16 +95,32 @@ func newServer() *cobra.Command {
 				log.Info("FTP service disabled.")
 			}
 
-			cs := cron.New()
+			if viper.GetBool("influxdb.enabled") {
+				influxDb, err := influxdb.New(log, vp, bus)
+				if err != nil {
+					log.Error("Failed to initialise influxdb service.", zap.Error(err))
+					return err
+				}
+
+				go func() {
+					influxDb.Run(ctx)
+				}()
+			} else {
+				log.Info("InfluxDB service disabled.")
+			}
+
+			cs := cron.New(cron.WithLogger(&cronzap.Adapter{Log: log.With(zap.String("service", "cron"))}))
 
 			if viper.GetBool("realtime.enabled") {
 				reportSvc, err := reporting.New(log, vp, s)
 				if err != nil {
+					log.Error("Failed to initialise reporting service.", zap.Error(err))
 					return err
 				}
 
-				realtimeSvc, err := realtime.New(log, vp, reportSvc, ftpSvc)
+				realtimeSvc, err := realtime.New(log, vp, reportSvc, ftpSvc, bus)
 				if err != nil {
+					log.Error("Failed to initialise realtime service.", zap.Error(err))
 					return err
 				}
 
@@ -112,6 +134,7 @@ func newServer() *cobra.Command {
 			if viper.GetBool("camera.enabled") {
 				cameraSvc, err := camera.New(log, vp, ftpSvc)
 				if err != nil {
+					log.Error("Failed to initialise camera service.", zap.Error(err))
 					return err
 				}
 
@@ -123,18 +146,24 @@ func newServer() *cobra.Command {
 			}
 
 			if viper.GetBool("archive.enabled") {
+				log.Info("Archive service enabled.")
+
 				archiveSvc, err := archive.New(log, db, vp, s, ftpSvc)
 				if err != nil {
+					log.Error("Failed to initialise archive service.", zap.Error(err))
 					return err
 				}
 
 				// run at 00:30 each day
 				sch, err := cron.ParseStandard("30 0 * * *")
 				if err != nil {
+					// Should never happen and represents a programming error
 					panic(fmt.Sprintf("Unable to parse cron spec: %s", err))
 				}
 
 				cs.Schedule(sch, archiveSvc)
+			} else {
+				log.Info("Archive service disabled.")
 			}
 
 			cs.Start()

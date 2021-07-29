@@ -14,35 +14,12 @@ var (
 	NewObservation = event.T("store:new_observation")
 )
 
-type config struct {
-	Bus *event.Bus
-}
-
-type OptionFn func(c *config)
-
-func WithBus(eb *event.Bus) OptionFn {
-	return func(c *config) {
-		c.Bus = eb
-	}
-}
-
 type Store struct {
 	db  *gorm.DB
 	bus *event.Bus
 }
 
-func New(db *gorm.DB, opts ...OptionFn) (*Store, error) {
-	c := config{}
-	for _, opt := range opts {
-		opt(&c)
-	}
-
-	bus := c.Bus
-	if bus == nil {
-		// No one will be listening to this bus, but it keeps the code simple elsewhere
-		bus = event.New()
-	}
-
+func New(db *gorm.DB, bus *event.Bus) (*Store, error) {
 	err := db.AutoMigrate(Observation{})
 	if err != nil {
 		return nil, fmt.Errorf("db migrate: %w", err)
