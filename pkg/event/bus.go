@@ -42,6 +42,13 @@ func (bus *Bus) Subscribe(topic Topic, sub interface{}) error {
 	return nil
 }
 
+func (bus *Bus) MustSubscribe(topic Topic, sub interface{}) {
+	err := bus.Subscribe(topic, sub)
+	if err != nil {
+		panic("Failed to subscribe: " + err.Error())
+	}
+}
+
 // HasSubscribers returns true if topic has any subscribers.
 func (bus *Bus) HasSubscribers(topic Topic) bool {
 	bus.mu.RLock()
