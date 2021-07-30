@@ -105,6 +105,10 @@ func (s *Service) ArchiveAll() error {
 		}
 	}
 
+	s.log.Info("Executing SQLite VACUUM.")
+	s.db.Exec("VACUUM")
+	s.log.Info("SQLite VACUUM complete.")
+
 	return nil
 }
 
@@ -135,71 +139,51 @@ var (
 
 // Archive will archive the data for the day specified by t and return a path to the archived
 // file.
-func (s *Service) Archive(t time.Time) (res string, err error) {
+func (s *Service) Archive(t time.Time) (path string, err error) {
 	tt := now.With(t)
 	start := tt.BeginningOfDay()
 	end := start.AddDate(0, 0, 1)
 
-	err = s.db.Transaction(func(tx *gorm.DB) (err error) {
-		rows, err := s.findRows(tx, start, end)
-		if err != nil {
-			return err
-		}
-
-		if len(rows) == 0 {
-			return ErrNoData
-		}
-
-		var (
-			wr   io.WriteCloser
-			path = fmt.Sprintf("observations_%s.csv", start.Format("20060102"))
-		)
-
-		var useBrotli = brotli.IsAvailable() && s.compression == CompressionBrotli
-
-		if useBrotli {
-			path = path + ".br"
-		} else {
-			path = path + ".gz"
-		}
-
-		f, err := os.Create(path)
-		if err != nil {
-			return err
-		}
-		defer func() { _ = f.Close() }()
-
-		if useBrotli {
-			// Ignore err as brotli is available, given earlier test
-			wr, _ = brotli.NewWriter(f)
-		} else {
-			wr, _ = gzip.NewWriterLevel(f, gzip.BestCompression)
-		}
-		defer func() { _ = wr.Close() }()
-
-		err = gocsv.Marshal(rows, wr)
-		if err != nil {
-			return err
-		}
-
-		if useBrotli {
-			_ = wr.Close()
-			err := brotli.TestArchive(path)
-			if err != nil {
-				return err
-			}
-		}
-
-		res = path
-
-		return wr.Close()
-	})
-
+	var rows []*store.Observation
+	rows, err = s.findRows(s.db, start, end)
 	if err != nil {
 		return "", err
 	}
 
-	return res, nil
+	if len(rows) == 0 {
+		return "", ErrNoData
+	}
+
+	path = fmt.Sprintf("observations_%s.csv", start.Format("20060102"))
+	var useBrotli = brotli.IsAvailable() && s.compression == CompressionBrotli
+
+	if useBrotli {
+		path = path + ".br"
+	} else {
+		path = path + ".gz"
+	}
+
+	f, err := os.Create(path)
+	if err != nil {
+		return "", err
+	}
+	defer func() { _ = f.Close() }()
+
+	var wr io.WriteCloser
+	if useBrotli {
+		// Ignore err as brotli is available, given earlier test
+		wr, _ = brotli.NewWriter(f)
+	} else {
+		wr, _ = gzip.NewWriterLevel(f, gzip.BestCompression)
+	}
+	defer func() { _ = wr.Close() }()
+
+	err = gocsv.Marshal(rows, wr)
+	if err != nil {
+		return "", err
+	}
+
+	return path, nil
 }
 
 func (s *Service) findRows(tx *gorm.DB, start, end time.Time) ([]*store.Observation, error) {

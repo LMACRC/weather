@@ -1,10 +1,11 @@
 # Global configuration parameters for the weather
 # programme.
 
+[database]
 #
-# Path to the SQLite database file.
+# URL to configure the SQLite database file.
 #
-database_path = "weather.db"
+url = "weather.db?_busy_timeout=10000,cache=shared"
 
 #
 # Location of weather station
@@ -21,13 +22,39 @@ location  = { latitude = -41.440577, longitude = 147.226651 }
 # Local port to listen for Ecowitt POST requests.
 port = 9876
 
+# archive configures the archiving service, which is
+# responsible for exporting the daily weather time series data
+# into compressed CSV files
+[archive]
+enabled = true
+# Compression method of archive files (brotli, gzip)
+# NOTE: The brotli executable must be installed and in the path
+compression = "brotli"
+local_dir   = "."
+remote_dir  = "/public_html/wp-content/uploads/weather"
+# A template for the filename of the archived csv data.
+# See the camera module for a description of how to use
+# the template feature.
+filename    = 'archive_{{ strftime "%Y%m%d" .Now }}.csv'
+
+#
+# Configuration to publish realtime weather information to InfluxDB
+[influxdb]
+enabled     = false
+server      = "http://localhost:8086"
+database    = "weather"
+measurement = "observations"
+
 #
 # Configuration for the FTP client service.
 #
 [ftp]
-address  = "<host>:<port>"
-username = "<username>"
-password = "<password>"
+enabled     = false
+address     = "<host>:<port>"
+username    = "<username>"
+password    = "<password>"
+# Maximum number of retries before abandoning a file upload
+retries     = 5
 
 #
 # Section for configuring the service to generate
@@ -80,6 +107,29 @@ local_dir = "."
 remote_dir = "/public_html/wp-content/uploads/weather"
 
 # A template for the filename of the captured image.
+# The template uses the Go text/template package, as documented
+# https://pkg.go.dev/text/template.
+#
+# The template is provided the following values:
+#
+# * Now - contains the current time
+#
+# The template is provide the following special functions:
+#
+# * strftime [format] [timestamp] which supports the following
+#   format specifications: https://github.com/lestrrat-go/strftime#supported-conversion-specifications
+#
+# Example:
+#
+# If the camera module captures images every hour.
+#
+# filename = 'webcam_{{ strftime "%H%M" .Now }}.jpg'
+#
+# will generate files named:
+#
+# webcam_0800.jpg
+# webcam_0900.jpg
+# ...
 filename = "webcam_latest.jpg"
 
 #

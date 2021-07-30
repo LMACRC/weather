@@ -8,7 +8,7 @@ import (
 )
 
 func OpenDb(path string) (*gorm.DB, error) {
-	db, err := gorm.Open(sqlite.Open(path), &gorm.Config{})
+	db, err := gorm.Open(sqlite.Open(path+"?_busy_timeout="), &gorm.Config{})
 	if err != nil {
 		return nil, fmt.Errorf("db open: %w", err)
 	}

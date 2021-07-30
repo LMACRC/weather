@@ -15,7 +15,7 @@ import (
 func newArchiveCommand() *cobra.Command {
 	return &cobra.Command{
 		Use:   "archive YYYYMMDD,[YYYYMMDD]",
-		Short: "Return CSV archive",
+		Short: "Generate CSV archives for historical data on specific dates",
 		Args:  cobra.MinimumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) (err error) {
 			log := zap.NewNop()

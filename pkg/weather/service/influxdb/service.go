@@ -84,8 +84,6 @@ func (s *Service) HandleStatistics(stats *reporting.Statistics) {
 		"temp_units":     stats.TempUnits,
 		"pressure_units": stats.PressureUnits,
 		"rain_units":     stats.RainUnits,
-		"wind_direction": stats.WindDirection.String(),
-		"is_daylight":    boolToString(stats.IsDaylight),
 	}
 
 	fields := map[string]interface{}{
@@ -107,6 +105,8 @@ func (s *Service) HandleStatistics(stats *reporting.Statistics) {
 		"uv_index":                stats.UVIndex,
 		"solar_radiation_wsm":     stats.SolarRadiation.WattsPerSquareMetre(),
 		"apparent_temp_c":         stats.ApparentTemp.Celsius(),
+		"wind_direction":          stats.WindDirection.String(),
+		"is_daylight":             boolToString(stats.IsDaylight),
 	}
 
 	p, err := client.NewPoint(s.measurement, tags, fields, stats.Timestamp)

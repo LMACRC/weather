@@ -170,6 +170,11 @@ func (s Service) processNextImage(ctx context.Context, ts time.Time) {
 	}
 	defer func() { _ = file.Close() }()
 
+	if s.ftp == nil {
+		// FTP service is disabled
+		return
+	}
+
 	s.log.Info("Enqueue image upload.", zap.String("path", fullPath))
 	err = s.ftp.Enqueue(service.FtpRequest{
 		LocalPath:      fullPath,

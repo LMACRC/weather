@@ -64,7 +64,7 @@ func newServer() *cobra.Command {
 
 			log.Info("Loaded config.", zap.String("path", viper.ConfigFileUsed()))
 
-			db, err := weather.OpenDb(viper.GetString("database_path"))
+			db, err := weather.OpenDb(viper.GetString("database.url"))
 			if err != nil {
 				log.Error("Failed to open database.", zap.Error(err))
 				return err

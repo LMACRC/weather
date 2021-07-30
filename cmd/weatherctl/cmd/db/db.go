@@ -42,7 +42,7 @@ func NewDbCommand() *cobra.Command {
 			whttp.InitViper(vp)
 			archive.InitViper(vp)
 
-			db, err = weather.OpenDb(viper.GetString("database_path"))
+			db, err = weather.OpenDb(viper.GetString("database.url"))
 			if err != nil {
 				return err
 			}
@@ -59,6 +59,7 @@ func NewDbCommand() *cobra.Command {
 	cmd.AddCommand(newGetStatsCommand())
 	cmd.AddCommand(newGetImageCommand())
 	cmd.AddCommand(newArchiveCommand())
+	cmd.AddCommand(newArchiveAllCommand())
 
 	return cmd
 }
