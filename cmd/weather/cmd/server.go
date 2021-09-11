@@ -79,6 +79,7 @@ func newServer() *cobra.Command {
 			whttp.InitViper(vp)
 			archive.InitViper(vp)
 			influxdb.InitViper(vp)
+			camera.InitViper(vp)
 
 			var ftpSvc *ftp.Service
 			if viper.GetBool("ftp.enabled") {

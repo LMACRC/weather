@@ -146,3 +146,10 @@ height = 480
 # Valid values are 0, 90, 180 or 270.
 rotate = 270
 
+#
+# Parameters to configure the output image
+#
+[camera.output_params]
+
+# Color of the text using hex notation
+text_color = "#ff6400"

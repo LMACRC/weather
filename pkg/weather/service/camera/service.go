@@ -5,7 +5,6 @@ import (
 	"context"
 	"fmt"
 	"image"
-	"image/color"
 	"image/jpeg"
 	"os"
 	"path/filepath"
@@ -14,6 +13,7 @@ import (
 
 	"github.com/lmacrc/weather/pkg/filepath/template"
 	"github.com/lmacrc/weather/pkg/weather/service"
+	"github.com/mitchellh/mapstructure"
 	"github.com/robfig/cron/v3"
 	"github.com/spf13/viper"
 	"go.uber.org/zap"
@@ -24,19 +24,20 @@ import (
 )
 
 type Service struct {
-	log       *zap.Logger
-	ftp       service.Ftp
-	camera    Capturer
-	params    CaptureParams
-	localDir  string
-	remoteDir string
-	filename  *template.Template
-	schedule  cron.Schedule
+	log          *zap.Logger
+	ftp          service.Ftp
+	camera       Capturer
+	params       CaptureParams
+	outputParams OutputParams
+	localDir     string
+	remoteDir    string
+	filename     *template.Template
+	schedule     cron.Schedule
 }
 
 func New(log *zap.Logger, vp *viper.Viper, ftp service.Ftp) (*Service, error) {
 	var cfg Config
-	if err := vp.UnmarshalKey("camera", &cfg); err != nil {
+	if err := vp.UnmarshalKey("camera", &cfg, viper.DecodeHook(mapstructure.TextUnmarshallerHookFunc())); err != nil {
 		return nil, fmt.Errorf("config: %w", err)
 	}
 
@@ -53,14 +54,15 @@ func New(log *zap.Logger, vp *viper.Viper, ftp service.Ftp) (*Service, error) {
 	}
 
 	s := &Service{
-		log:       log.With(zap.String("service", "camera")),
-		ftp:       ftp,
-		camera:    camera,
-		params:    cfg.CaptureParams,
-		localDir:  cfg.LocalDir,
-		remoteDir: cfg.RemoteDir,
-		filename:  template.Must(template.New("file").Parse(cfg.Filename)),
-		schedule:  schedule,
+		log:          log.With(zap.String("service", "camera")),
+		ftp:          ftp,
+		camera:       camera,
+		params:       cfg.CaptureParams,
+		outputParams: cfg.OutputParams,
+		localDir:     cfg.LocalDir,
+		remoteDir:    cfg.RemoteDir,
+		filename:     template.Must(template.New("file").Parse(cfg.Filename)),
+		schedule:     schedule,
 	}
 
 	return s, nil
@@ -146,7 +148,7 @@ func (s Service) addTimestamp(img *image.RGBA, ts time.Time) {
 	bottom := img.Bounds().Max.Y - 10
 	d := &font.Drawer{
 		Dst:  img,
-		Src:  image.NewUniform(color.RGBA{R: 200, G: 100, A: 255}),
+		Src:  image.NewUniform(s.outputParams.TextColor.ToRGBA()),
 		Face: inconsolata.Bold8x16,
 		Dot:  fixed.P(10, bottom),
 	}

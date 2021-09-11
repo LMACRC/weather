@@ -5,6 +5,7 @@ import (
 	"github.com/lmacrc/weather/pkg/weather"
 	whttp "github.com/lmacrc/weather/pkg/weather/http"
 	"github.com/lmacrc/weather/pkg/weather/service/archive"
+	"github.com/lmacrc/weather/pkg/weather/service/camera"
 	"github.com/lmacrc/weather/pkg/weather/store"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -41,6 +42,7 @@ func NewDbCommand() *cobra.Command {
 			vp := viper.GetViper()
 			whttp.InitViper(vp)
 			archive.InitViper(vp)
+			camera.InitViper(vp)
 
 			db, err = weather.OpenDb(viper.GetString("database.url"))
 			if err != nil {
